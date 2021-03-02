@@ -1,0 +1,28 @@
+sue_sel.hpp
+sue_sel.cpp   Describes the main classes of the library, needed in almost 
+              every event-driven application, including the EventSelector
+              (which manages the main select(2) loop), FdHandler, 
+              TimeoutHandler, SignalHandler and the exception class.
+
+sue_sess.hpp
+sue_sess.cpp  Provides the class SUEGenericDuplexSession which represents
+              a hope-to-be-generic duplex session which communicates via 
+              a single descriptor (e.g. a socket) coupled with timeout
+              mechanism.
+
+sue_inet.hpp
+sue_inet.cpp  Provides an intermediate class SUEInetDuplexSession
+
+sue_tcps.hpp
+sue_tcps.cpp  Provides classes to create a simple multiuser TCP server
+
+sue_tcpc.hpp
+sue_tcpc.cpp  Provides classes to create a simple TCP client session
+
+sue_wait.hpp
+sue_wait.cpp  Makes it easier to handle the event of "child exited/killed"
+
+suedoxy.conf  The configuration file for Doxygen to create the docs
+doc.dxg       The main page of the Doxygen documentation
+
+demo/         Directory which contains some useful examples

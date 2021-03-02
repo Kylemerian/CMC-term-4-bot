@@ -1,0 +1,163 @@
+/*!
+
+\mainpage Simple Unix Events (SUE) Library.
+
+Visit the official site at
+<A HREF="http://www.croco.net/software/sue">
+http://www.croco.net/software/sue</A>
+
+\section intro Introduction
+
+Simple Unix Events (SUE) Library is a small and light-weight set of
+C++ classes which lets you easily create an event-driven application
+with C++ under Unix. 
+
+There are three types of events SUE can let you handle:
+  - Unix signals;
+  - Preset time moments; 
+  - Changing state of a file descriptor (see select(2) for details). 
+
+There is a specific support for client and server TCP sessions as well.
+This makes the library specially useful in implementing multiclient TCP 
+servers which run as a single process handling all the clients without
+forking off any children.
+ 
+
+\section quickstart Getting Started
+
+First of all, you'll need one (and, likely, only one) object of the 
+SUEEventSelector class. This object will be the heart of your application.
+In fact, you will always need an access to the object so you can consider
+making it a global variable. Another (and better) way is to create the 
+object once and then pass its address to all your subsystems so that they
+can access it. Personally I prefer never never never ever use global 
+variables, just as a matter of style.
+
+SUEEventSelector provides the Go() method which will be the main loop of
+your application. 
+
+In order to handle some events, you'll need the following classes:
+  - SUEFdHandler to handle events on file descriptors;
+  - SUETimeoutHandler to handle timeouts (that is, fixed time moments
+    which require some actions once the time comes);
+  - SUESignalHandler to handle Unix signals; 
+  - SUEChildHandler to handle your zombies.
+
+These classes are bases for your very own handlers; to make a handler, 
+make your own class derived from the respective SUExxxxHandler overriding
+its virtual functions as necessary. 
+
+\section sessionhandling Sophisticated TCP Clients and Servers
+
+Besides the basic event handling classes, the library includes some
+support for higher level abstractions such as TCP sessions.
+
+Take a look at the following classes:
+   - SUETcpServer - multiclient TCP server;
+   - SUETcpServerSession - a session spawned by SUETcpServer;
+   - SUETcpClientSession - a client TCP session.
+
+If you want to create a duplex protocol session over a transport other than
+TCP (e.g., a socket from AF_UNIX communication domain), you might want
+to look at the SUEGenericDuplexSession class as well.
+     
+
+\section examplelist Learn from samples
+
+It is well-known that the best way to learn something is to look at a 
+good example and try to repeat it. Here are some working demo programs 
+which come along with the library.
+
+The example \link sleep5.cpp \endlink is perhaps the simplest 
+event-driven application ever made. It is intended to give you 
+the basic idea how to work with SUEEventSelector and its company.
+
+Another example, \link sitter.cpp \endlink, is probably more interesting
+for you because it uses two different types of events. First, it uses 
+timeouts, just like the previous one (but it changes the moment from time
+to time). Second, it handles the event of arriving data on the standard
+input. 
+
+Yet another example, \link chat.cpp \endlink, is a very simple sample of a 
+multiclient TCP server. It is a chat room. You can learn how to use the 
+SUETcpServer and SUETcpServerSession classes (or, more precisely, how to 
+create appropriate childern of them and use the children, not the classes 
+themselves).
+
+Well if you need to make your application to work as a TCP client rather 
+than server (or even a client to one and server to another), take a look 
+at \link hellobot.cpp \endlink, which demonstrates the SUETcpClientSession 
+class. It is a bot for the previous example. The bot connects to the 
+server and greets everyone who joins the chat room. 
+
+The last two sample programs are \link sigs.cpp \endlink and \link 
+children.cpp \endlink; they are to give you an idea on handling unix 
+signals (and, as a special case, the SIGCHLD signal) with SUE.
+
+*/
+
+
+
+/*! \example sleep5.cpp
+
+This program is a good example to start with. It only uses one time-based
+event. Before entering the main loop, the event is scheduled to happen 
+5 seconds later since the moment of calling SetFromNow(), then the event
+is registered with the selector and the main loop is launched. Once the
+event came, it is handled by the function AbortingTimeout::TimeoutHandle()
+which causes the main loop to exit using the SUEEventSelector::Break()
+method. All the example program do is sleeping for 5 seconds and then exiting.
+
+*/
+
+/*! \example sitter.cpp
+
+This program acts like an ideal babysitter. It listens for all we want to 
+tell it, until we make a long (10 seconds) pause. Once we do, it assumes 
+the baby is sleeping and exits.
+
+The program uses two sources of events - the standard input stream and the
+timer. Each time the descriptor #0 shows there's some data there, the 
+program tries to read 4k chars from stdin (for most cases, it is sufficient
+to read all the data which currently there) and resets the time-based event
+to be 10 seconds from now. 
+
+Once the time event occurs, it assumes there was no activity for 10 seconds,
+so we can assume the baby went to sleep.
+
+*/
+
+/*! \example chat.cpp
+
+This example is a chat room which can be considered to be one of the 
+simplest tasks solved by multiclient TCP daemons which can't fork a child 
+for every client session because of inter-client dataflows.
+
+*/
+
+/*! \example hellobot.cpp
+
+This is a simple TCP client which is a "bot" for the \link chat.cpp 
+\endlink example. It connects to the server, waits for people to come in 
+the room and says Hello to each one coming.
+
+*/
+
+/*! \example sigs.cpp
+
+This is an example of handling unix signals with SUE. What does this 
+program do is intercepting SIGINT (Ctrl-C) and SIGQUIT (Ctrl-\\); try 
+pressing Ctrl-C to see it works, and press Ctrl-\\ to cause the program to 
+exit.  
+
+*/
+
+/*! \example children.cpp
+
+One of the most often cases of signal handling is handling of the children 
+to avoid zombies. This demo launches a child every second; the child 
+simply sleeps 1 to 10 seconds (the particular interval is choosen based on 
+random()) and exits. The main process intercepts SIGCHLD using SUE and 
+prints a message about every finished process.
+
+*/
