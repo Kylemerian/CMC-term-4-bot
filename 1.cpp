@@ -74,7 +74,7 @@ void textline::getNext(int servfd)
     }
     /*printf("    size = %d\n", size);*/
     buf[size] = 0;
-    /**/printf("DBG %s\n", buf);
+    /*printf("DBG %s\n", buf);*/
     
 }
 
@@ -86,21 +86,13 @@ void prepare4Game(int servfd, char ** nicks)
     cmd.getNext(servfd);
     while(!cmd.hasSubStr("START"))
         cmd.getNext(servfd);
-    while(1){
-        dprintf(servfd, "buy 2 600\nsell 2 4500\nproduce 2\nturn\n");
-        cmd.getNext(servfd);
-        while(!cmd.isBotLine()) /**/
+    while(!cmd.hasSubStr("WIN")){
+        dprintf(servfd, "buy 2 600\nsell 2 4500\nprod 2\nturn\n");
+        while(!cmd.hasSubStr("ENDTURN")){
             cmd.getNext(servfd);
-        if(cmd.hasSubStr("WIN"))
-            break;
-        while(!cmd.isBotLine()) /**/
-            cmd.getNext(servfd);
-        if(cmd.hasSubStr("WIN"))
-            break;
-        while(!cmd.isBotLine()) /**/
-            cmd.getNext(servfd);
-        if(cmd.hasSubStr("WIN"))
-            break;
+            if(cmd.hasSubStr("WIN"))
+                break;
+        }
     }
 }
 
