@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 struct user
 {
@@ -30,6 +31,7 @@ private:
     char * buf;
     int size;
     int gmEnd;
+    int flagRead;
     void resize();
 public:    
     textline()
@@ -39,11 +41,8 @@ public:
         size = 0;
         buf[0] = 0;
         gmEnd = 0;
+        flagRead = 1;
     };
-    /*void print() const
-    {
-        printf("%s\n", buf);
-    }*/
     int hasSubStr(const char * str) const
     {
         return (strstr(buf, str) != nullptr);
@@ -59,11 +58,22 @@ public:
     void getNext(int servfd);
     void setPrices(int servfd, trading * trd);
     void setResrcs(int servfd, user * bot);
+    void cleanReqs(int servfd);
 };
 
 int isDigit(int c)
 {
     return(c >= '0' && c <= '9');
+}
+
+void textline::cleanReqs(int servfd)
+{
+    fcntl(servfd, F_SETFL, fcntl (servfd, F_GETFL, 0) | O_NONBLOCK);
+    do
+    {
+        this->getNext(servfd);
+    } while(this -> flagRead != -1);
+    fcntl(servfd, F_SETFL, fcntl (servfd, F_GETFL, 0) & ~O_NONBLOCK);
 }
 
 void textline::resize()
@@ -97,7 +107,6 @@ void textline::setPrices(int servfd, trading * trd)
     dprintf(servfd, "market\n");
     this->getNext(servfd);
     this->getNext(servfd);
-
     while(this -> buf[i] != 0){
         if(!isDigit(this -> buf[i]))
             this -> buf[i] = ' ';
@@ -112,10 +121,9 @@ void textline::getNext(int servfd)
 {
     buf[size] = 0;
     size = 0;
-
     while(1){
-        read(servfd, &buf[size], 1);
-        if(buf[size] == '\n')
+        this -> flagRead = read(servfd, &buf[size], 1);
+        if(buf[size] == '\n' || this -> flagRead == -1)
             break;
         if(buf[size] == '\r'){
             buf[size] = ' ';
@@ -125,12 +133,9 @@ void textline::getNext(int servfd)
             this -> resize();
     }
     buf[size] = 0;
-    if(this -> hasSubStr("WIN")){
-        /**/printf("        win was here\n");
+    if(this -> hasSubStr("WIN"))
         this -> gmEnd = 1;
-    }
-    printf("DBG %s\n", buf);
-    
+    //printf("DBG %s %d \n", buf, size);
 }
 
 void prepare4Game(int servfd, char ** nicks)
@@ -141,21 +146,21 @@ void prepare4Game(int servfd, char ** nicks)
     bot.nick = nicks[4];
     dprintf(servfd, "%s\n", nicks[4]);
     dprintf(servfd, ".join %s\n", nicks[3]);
-    cmd.getNext(servfd);
-    while(!cmd.hasSubStr("START"))
+    do
+    {
         cmd.getNext(servfd);
+    } while(!cmd.hasSubStr("START"));
+
     while(!cmd.isEnded()){
         cmd.setPrices(servfd, &curTrade);
         cmd.setResrcs(servfd, &bot);
-
+        
         dprintf(servfd,"buy 2 %d\nsell 2 %d\n",curTrade.bought,curTrade.sold);
         dprintf(servfd, "prod 2\nturn\n");
-
-        while(!cmd.hasSubStr("ENDTURN")){
-            /**/if(cmd.isEnded())
-            /**/    break;
+        
+        while(!cmd.hasSubStr("ENDTURN"))
             cmd.getNext(servfd);
-        }
+        cmd.cleanReqs(servfd);
     }
 }
 
@@ -172,9 +177,11 @@ int main(int argc, char ** argv)
     addr.sin_port = htons(atoi(argv[2]));
     if(!inet_aton(argv[1], &(addr.sin_addr))){
         printf("IP-convertation error\n");
+        exit(1);
     }
     if(0 != connect(sockfd, (struct sockaddr *)&addr, sizeof(addr))){
         printf("Connection error\n");
+        exit(1);
     }
     prepare4Game(sockfd, argv);
     return 0;
