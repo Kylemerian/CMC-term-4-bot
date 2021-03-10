@@ -14,7 +14,7 @@ struct user
     int prod;
     int factories;
     int money;
-    int isBankrupt;
+    int isCreator;
     const char * nick;
 };
 
@@ -45,7 +45,7 @@ public:
     };
     int hasSubStr(const char * str) const
     {
-        return (strstr(buf, str) != nullptr);
+        return (strstr(buf, str) != NULL);
     }
     int isEnded()
     {
@@ -66,22 +66,12 @@ int isDigit(int c)
     return(c >= '0' && c <= '9');
 }
 
-void textline::cleanReqs(int servfd)
-{
-    fcntl(servfd, F_SETFL, fcntl (servfd, F_GETFL, 0) | O_NONBLOCK);
-    do
-    {
-        this->getNext(servfd);
-    } while(this -> flagRead != -1);
-    fcntl(servfd, F_SETFL, fcntl (servfd, F_GETFL, 0) & ~O_NONBLOCK);
-}
-
 void textline::resize()
 {
     char * tmp = (char *)malloc(2 * capacity);
-    strncpy(tmp, this -> buf, this -> size);
-    free(this -> buf);
-    this -> buf = tmp;
+    strncpy(tmp, buf, size);
+    free(buf);
+    buf = tmp;
     capacity *= 2;
 }
 
@@ -89,15 +79,15 @@ void textline::setResrcs(int servfd, user * bot)
 {
     int i = 0;
     dprintf(servfd, "info\n");
-    while(!this->hasSubStr(bot->nick))
-        this->getNext(servfd);
+    while(!hasSubStr(bot->nick))
+        getNext(servfd);
 
-    while(this -> buf[i] != 0){
-        if(!isDigit(this -> buf[i]))
-            this -> buf[i] = ' ';
+    while(buf[i] != 0){
+        if(!isDigit(buf[i]))
+            buf[i] = ' ';
         i++;
     }
-    sscanf(this -> buf, "%d%d%d%d", &bot->raw, &bot->prod, 
+    sscanf(buf, "%d%d%d%d", &bot->raw, &bot->prod, 
         &bot->money, &bot->factories);
 }
 
@@ -105,16 +95,18 @@ void textline::setPrices(int servfd, trading * trd)
 {
     int i = 0;
     dprintf(servfd, "market\n");
-    this->getNext(servfd);
-    this->getNext(servfd);
-    while(this -> buf[i] != 0){
-        if(!isDigit(this -> buf[i]))
-            this -> buf[i] = ' ';
+    do
+    {
+        getNext(servfd);
+    } while(!hasSubStr("MARKET"));
+    while(buf[i] != 0){
+        if(!isDigit(buf[i]))
+            buf[i] = ' ';
         i++;
     }
-    sscanf(this -> buf, "%d%d%d%d", &i, &trd->bought, &i, &trd->sold);
+    sscanf(buf, "%d%d%d%d", &i, &trd->bought, &i, &trd->sold);
     printf("%d %d\n", trd->bought, trd->sold);
-    this->getNext(servfd);
+    getNext(servfd);
 }
 
 void textline::getNext(int servfd)
@@ -122,8 +114,8 @@ void textline::getNext(int servfd)
     buf[size] = 0;
     size = 0;
     while(1){
-        this -> flagRead = read(servfd, &buf[size], 1);
-        if(buf[size] == '\n' || this -> flagRead == -1)
+        flagRead = read(servfd, &buf[size], 1);
+        if(buf[size] == '\n' || flagRead == -1)
             break;
         if(buf[size] == '\r'){
             buf[size] = ' ';
@@ -133,24 +125,53 @@ void textline::getNext(int servfd)
             this -> resize();
     }
     buf[size] = 0;
-    if(this -> hasSubStr("WIN"))
-        this -> gmEnd = 1;
-    //printf("DBG %s %d \n", buf, size);
+    if(hasSubStr("WIN") || hasSubStr("BANKRUPT"))
+        gmEnd = 1;
+    printf("DBG %s\n", buf);
 }
 
-void prepare4Game(int servfd, char ** nicks)
+void createOrJoin(int argc, char ** argv, int servfd, textline & cmd)
 {
-    textline cmd;
-    user bot;
-    trading curTrade;
-    bot.nick = nicks[4];
-    dprintf(servfd, "%s\n", nicks[4]);
-    dprintf(servfd, ".join %s\n", nicks[3]);
+    if(argc == 5){
+        dprintf(servfd, ".join %s\n", argv[4]);
+    }
+    else{
+        int pcnt = 0;
+        dprintf(servfd, ".create\n");
+        while(pcnt != atoi(argv[5])){
+            cmd.getNext(servfd);
+            if(cmd.hasSubStr("JOIN"))
+                pcnt++;
+            if(cmd.hasSubStr("LEFT"))
+                pcnt--;
+        }
+        dprintf(servfd, "start\n");
+    }             
     do
     {
         cmd.getNext(servfd);
     } while(!cmd.hasSubStr("START"));
+}
 
+void printGameInfo(user bot, trading trade)
+{
+    printf("@@ price prod = %d\n", trade.sold);
+    printf("@@ price raw = %d\n", trade.bought);
+
+    printf("@@ money = %d\n", bot.money);
+    printf("@@ raw = %d\n", bot.raw);
+    printf("@@ prod = %d\n", bot.prod);
+    printf("@@ plants = %d\n", bot.factories);
+}
+
+void prepare4Game(int servfd, char ** args, int argc)
+{
+    textline cmd;
+    user bot;
+    trading curTrade;
+    bot.nick = args[3];
+    dprintf(servfd, "%s\n", args[3]);
+    createOrJoin(argc, args, servfd, cmd);
     while(!cmd.isEnded()){
         cmd.setPrices(servfd, &curTrade);
         cmd.setResrcs(servfd, &bot);
@@ -158,9 +179,14 @@ void prepare4Game(int servfd, char ** nicks)
         dprintf(servfd,"buy 2 %d\nsell 2 %d\n",curTrade.bought,curTrade.sold);
         dprintf(servfd, "prod 2\nturn\n");
         
-        while(!cmd.hasSubStr("ENDTURN"))
+        printGameInfo(bot, curTrade);
+        
+        while(!cmd.hasSubStr("ENDTURN")){
             cmd.getNext(servfd);
-        cmd.cleanReqs(servfd);
+            if(cmd.isEnded())
+                //printf("        I was here\n");
+                break;
+        }
     }
 }
 
@@ -168,7 +194,8 @@ int main(int argc, char ** argv)
 {
     int sockfd;
     struct sockaddr_in addr;
-    if(argc != 5){  //to be changed (now ip+port+nick/room to join + botNick)
+    if(argc != 5 && argc != 6){ 
+        //to be changed (now ip+port+nick/room to join + botNick)
         printf("Wrong number of args\n");
         exit(1);
     }
@@ -183,6 +210,6 @@ int main(int argc, char ** argv)
         printf("Connection error\n");
         exit(1);
     }
-    prepare4Game(sockfd, argv);
+    prepare4Game(sockfd, argv, argc);
     return 0;
 }
