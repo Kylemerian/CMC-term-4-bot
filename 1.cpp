@@ -94,9 +94,20 @@ int isDigit(int c)
     return(c >= '0' && c <= '9');
 }
 
+int isAlpha(int c)
+{
+    return((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'));
+}
+
 void textline::cleanAllChars()
 {
-    int i = 0;
+    int i = 1;
+    while(buf[i] != 0){
+        if(isAlpha(buf[i - 1]) || isAlpha(buf[i + 1]))
+            buf[i] = ' ';
+        i++;
+    }
+    i = 0;
     while(buf[i] != 0){
         if(!isDigit(buf[i]))
             buf[i] = ' ';
