@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+const char * botNick;
+
 struct user
 {
     int raw;
@@ -17,6 +19,10 @@ struct user
     //int isCreator;
     int isAlive;
     char * nick;
+    user()
+    {
+        isAlive = 1;
+    }
 };
 
 struct trading
@@ -61,7 +67,7 @@ public:
         free(buf);
     }
     void getNext(int servfd);
-    void setPrices(int servfd, trading * trd);
+    void setPrices(trading * trd);
     void cleanAllChars();
     void getFirstNum(int & a)
     {
@@ -125,22 +131,15 @@ void textline::setRsrcs(int servfd, user * usr)
     usr->isAlive = 1;
 }
 
-void textline::setPrices(int servfd, trading * trd)
+void textline::setPrices(trading * trd)
 {
     int i = 0;
-    dprintf(servfd, "market\n");
-    do
-    {
-        getNext(servfd);
-    } while(!hasSubStr("MARKET"));
     while(buf[i] != 0){
         if(!isDigit(buf[i]))
             buf[i] = ' ';
         i++;
     }
     sscanf(buf, "%d%d%d%d", &i, &trd->bought, &i, &trd->sold);
-    printf("%d %d\n", trd->bought, trd->sold);
-    getNext(servfd);
 }
 
 void textline::getNext(int servfd)
@@ -159,8 +158,13 @@ void textline::getNext(int servfd)
             this -> resize();
     }
     buf[size] = 0;
-    if(hasSubStr("WIN")) //to add bot nick
+    if(hasSubStr("WIN")){
+        if(!hasSubStr("YOU"))
+            printf("DEFEAT\n");
+        else
+            printf("VICTORY\n");
         gmEnd = 1;
+    }
     //printf("DBG %s\n", buf);
 }
 
@@ -170,6 +174,7 @@ private:
     user * users;
     trading prices;
     //trade;
+    int players;
     int alive;
     void initUsers(int servfd, textline & cmd);
     int findUser(user * users, textline & cmd);
@@ -180,42 +185,72 @@ public:
         users = NULL;
         alive = -1;
     }
+    int getSell() const
+    {
+        return prices.sold;
+    }
+    int getBuy() const
+    {
+        return prices.bought;
+    }
     void setPrices();
     void setUserInfo(int servfd, textline & cmd);
-    void print();
+    void print() const;
+    void setPrices(int servfd, textline & cmd);
+    ~gameInfo();
 };
 
-void gameInfo::print()
+gameInfo::~gameInfo()
 {
-    printf("--------------INFO------------\n");
-    printf("nick raw prod money plants\n");
-    for (int i = 0; i < alive; i++){
+    for (int i = 0; i < players; i++)
+        free(users[i].nick);
+    free(users);
+}
+
+void gameInfo::setPrices(int servfd, textline & cmd)
+{
+    dprintf(servfd, "market\n");
+    do
+    {
+        cmd.getNext(servfd);
+    } while(!cmd.hasSubStr("MARKET") && !cmd.isEnded());
+    cmd.setPrices(&prices);
+    cmd.getNext(servfd);
+}
+
+void gameInfo::print() const
+{
+    printf("---------------INFO-------------------\n");
+    printf("nick       raw prod  money plants\n");
+    for (int i = 0; i < players; i++){
         if(users[i].isAlive)
-            printf("%s %d %d %d %d\n", users[i].nick, users[i].raw,
+            printf("%10s %d %6d %6d %6d\n", users[i].nick, users[i].raw,
                 users[i].prod, users[i].money, users[i].factories);
     }
-    
-    
+    printf("BUY PRICE = %d\nSELL PRICE = %d\n", prices.bought, prices.sold);
 }
 
 void gameInfo::cleanAliveFlag()
 {
-    for (int i = 0; i < alive; i++){
+    for (int i = 0; i < players; i++){
         users[i].isAlive = 0;
     }
 }
 
 int gameInfo::findUser(user * users, textline & cmd)
 {
-    for(int i = 0; i < alive; i++){
+    for(int i = 0; i < players; i++){
         if(cmd.hasSubStr(users[i].nick))
             return i;
     }
+    //printf("MUST BE GAME END\n");
+    return -1;
 }
 
 void gameInfo::initUsers(int servfd, textline & cmd)
 {
     users = (user *)malloc(alive * sizeof(user));
+    players = alive;
     dprintf(servfd, "info\n");
     for (int i = 0; i < alive; i++){
         do{
@@ -239,6 +274,7 @@ void gameInfo::setUserInfo(int servfd, textline & cmd)
     cmd.cleanAllChars();
     cmd.getFirstNum(tmp);
     alive = tmp;
+    //printf("ALIVE NOW = %d\n", alive);
     if(users == NULL)
         initUsers(servfd, cmd);
     cleanAliveFlag();
@@ -248,7 +284,8 @@ void gameInfo::setUserInfo(int servfd, textline & cmd)
             cmd.getNext(servfd);
         } while(!cmd.hasSubStr("&"));
         tmp = findUser(users, cmd);
-        cmd.setRsrcs(servfd, &(users[tmp]));
+        if(tmp != -1)
+            cmd.setRsrcs(servfd, &(users[tmp]));
     }
 }
 
@@ -279,26 +316,26 @@ void prepare4Game(int servfd, char ** args, int argc)
 {
     textline cmd;
     gameInfo game;
-    //bot.nick = args[3];
+    botNick = args[3];
     dprintf(servfd, "%s\n", args[3]);
     createOrJoin(argc, args, servfd, cmd);
     while(!cmd.isEnded()){
+        printf("\nSTART TURN\n");
+
         game.setUserInfo(servfd, cmd);
-        game.print();
-        //cmd.setPrices(servfd, &curTrade);
-        //cmd.setResrcs(servfd, &bot);
+        game.setPrices(servfd, cmd);
+        if(!cmd.isEnded())
+            game.print();
         
-        dprintf(servfd,"buy 600 \nsell 2 4000\n");
+        dprintf(servfd,"buy 2 %d\nsell 2 %d\n", game.getBuy(), game.getSell());
         dprintf(servfd, "prod 2\nturn\n");
-        
-        //printGameInfo(bot, curTrade);
-        
         while(!cmd.hasSubStr("ENDTURN")){
             cmd.getNext(servfd);
             if(cmd.isEnded())
-                //printf("        I was here\n");
                 break;
         }
+        if(cmd.hasSubStr("ENDTURN"))
+            printf("END TURN\n");
     }
 }
 
