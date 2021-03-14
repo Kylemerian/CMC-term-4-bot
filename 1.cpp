@@ -10,6 +10,15 @@
 
 const char * botNick;
 
+
+struct trading
+{
+    int sold;
+    int bought;
+    int numSold;
+    int numBought;
+};
+
 struct user
 {
     int raw;
@@ -19,16 +28,15 @@ struct user
     //int isCreator;
     int isAlive;
     char * nick;
+    trading results;
     user()
     {
+        results.sold = 0;
+        results.numSold = 0;
+        results.bought = 0;
+        results.numBought = 0;
         isAlive = 1;
     }
-};
-
-struct trading
-{
-    int sold;
-    int bought;
 };
 
 struct textline
@@ -73,9 +81,12 @@ public:
     {
         sscanf(buf, "%d", &a);
     }
+    void getTwoNum(int & a, int &b)
+    {
+        sscanf(buf, "%d%d", &a, &b);
+    }
     void setRsrcs(int servfd, user * usr);
     char * getNick();
-    //void setResrcs(int servfd, user * bot);
 };
 
 int isDigit(int c)
@@ -107,7 +118,6 @@ char * textline::getNick()
     res = (char *)malloc(rrange - lrange + 1);
     strncpy(res, &tmp[lrange], rrange - lrange);
     res[rrange - lrange] = 0;
-    printf("NICK = %s\n", res);
     return res;
 }
 
@@ -123,11 +133,8 @@ void textline::resize()
 void textline::setRsrcs(int servfd, user * usr)
 {
     cleanAllChars();
-    //print();
     sscanf(buf, "%d%d%d%d", &usr->raw, &usr->prod, 
         &usr->money, &usr->factories);
-    /*printf("  %s %d %d %d %d\n", usr->nick, usr->raw, usr->prod, 
-        usr->money, usr->factories);*/
     usr->isAlive = 1;
 }
 
@@ -173,7 +180,6 @@ struct gameInfo
 private:
     user * users;
     trading prices;
-    //trade;
     int players;
     int alive;
     void initUsers(int servfd, textline & cmd);
@@ -197,6 +203,7 @@ public:
     void setUserInfo(int servfd, textline & cmd);
     void print() const;
     void setPrices(int servfd, textline & cmd);
+    void setTradeResults(int servfd, textline & cmd);
     ~gameInfo();
 };
 
@@ -221,11 +228,13 @@ void gameInfo::setPrices(int servfd, textline & cmd)
 void gameInfo::print() const
 {
     printf("---------------INFO-------------------\n");
-    printf("nick       raw prod  money plants\n");
+    printf("nick       raw prod  money plants  num  Bought num Sold\n");
     for (int i = 0; i < players; i++){
-        if(users[i].isAlive)
-            printf("%10s %d %6d %6d %6d\n", users[i].nick, users[i].raw,
-                users[i].prod, users[i].money, users[i].factories);
+        if(users[i].isAlive){
+            printf("%10s %3d %4d %6d %6d %4d %7d %3d %4d\n", users[i].nick, users[i].raw,
+                users[i].prod, users[i].money, users[i].factories, users[i].results.numBought,
+                    users[i].results.bought, users[i].results.numSold, users[i].results.sold);
+        }
     }
     printf("BUY PRICE = %d\nSELL PRICE = %d\n", prices.bought, prices.sold);
 }
@@ -243,7 +252,6 @@ int gameInfo::findUser(user * users, textline & cmd)
         if(cmd.hasSubStr(users[i].nick))
             return i;
     }
-    //printf("MUST BE GAME END\n");
     return -1;
 }
 
@@ -256,8 +264,6 @@ void gameInfo::initUsers(int servfd, textline & cmd)
         do{
             cmd.getNext(servfd);
         } while(!cmd.hasSubStr("&"));
-        /*printf("line for nick\n");*/
-        /*cmd.print();*/
         users[i].nick = cmd.getNick();
     }
     do{
@@ -286,6 +292,38 @@ void gameInfo::setUserInfo(int servfd, textline & cmd)
         tmp = findUser(users, cmd);
         if(tmp != -1)
             cmd.setRsrcs(servfd, &(users[tmp]));
+    }
+}
+
+void gameInfo::setTradeResults(int servfd, textline & cmd)
+{
+    for (int i = 0; i < players; i++){
+        users[i].results.bought = 0;
+        users[i].results.numBought = 0;
+        users[i].results.sold = 0;
+        users[i].results.numSold = 0;
+    }
+    
+    while(!cmd.hasSubStr("ENDTURN")){
+            cmd.getNext(servfd);
+            if(cmd.isEnded())
+                break;
+            if(cmd.hasSubStr("BOUGHT")){
+                int tmp;
+                for (int i = 0; i < players; i++)
+                    if(cmd.hasSubStr(users[i].nick))
+                        tmp = i;
+                cmd.cleanAllChars();
+                cmd.getTwoNum(users[tmp].results.numBought, users[tmp].results.bought);
+            }
+            if(cmd.hasSubStr("SOLD")){
+                int tmp;
+                for (int i = 0; i < players; i++)
+                    if(cmd.hasSubStr(users[i].nick))
+                        tmp = i;
+                cmd.cleanAllChars();
+                cmd.getTwoNum(users[tmp].results.numSold, users[tmp].results.sold);
+            }
     }
 }
 
@@ -320,22 +358,15 @@ void prepare4Game(int servfd, char ** args, int argc)
     dprintf(servfd, "%s\n", args[3]);
     createOrJoin(argc, args, servfd, cmd);
     while(!cmd.isEnded()){
-        printf("\nSTART TURN\n");
-
         game.setUserInfo(servfd, cmd);
         game.setPrices(servfd, cmd);
-        if(!cmd.isEnded())
-            game.print();
         
         dprintf(servfd,"buy 2 %d\nsell 2 %d\n", game.getBuy(), game.getSell());
         dprintf(servfd, "prod 2\nturn\n");
-        while(!cmd.hasSubStr("ENDTURN")){
-            cmd.getNext(servfd);
-            if(cmd.isEnded())
-                break;
-        }
-        if(cmd.hasSubStr("ENDTURN"))
-            printf("END TURN\n");
+
+        game.setTradeResults(servfd, cmd);
+        if(!cmd.isEnded())
+            game.print();
     }
 }
 
