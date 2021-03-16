@@ -8,9 +8,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-const char * botNick;
-
-
 struct trading
 {
     int sold;
@@ -25,7 +22,6 @@ struct user
     int prod;
     int factories;
     int money;
-    //int isCreator;
     int isAlive;
     char * nick;
     trading results;
@@ -66,7 +62,7 @@ public:
     {
         return gmEnd;
     }
-    void print()
+    void print() const
     {
         printf("%s\n", buf);
     }
@@ -77,11 +73,11 @@ public:
     void getNext(int servfd);
     void setPrices(trading * trd);
     void cleanAllChars();
-    void getFirstNum(int & a)
+    void getFirstNum(int & a) const
     {
         sscanf(buf, "%d", &a);
     }
-    void getTwoNum(int & a, int &b)
+    void getTwoNum(int & a, int &b) const
     {
         sscanf(buf, "%d%d", &a, &b);
     }
@@ -365,7 +361,7 @@ void prepare4Game(int servfd, char ** args, int argc)
 {
     textline cmd;
     gameInfo game;
-    botNick = args[3];
+    //botNick = args[3];
     dprintf(servfd, "%s\n", args[3]);
     createOrJoin(argc, args, servfd, cmd);
     while(!cmd.isEnded()){
@@ -386,19 +382,18 @@ int main(int argc, char ** argv)
     int sockfd;
     struct sockaddr_in addr;
     if(argc != 5 && argc != 6){ 
-        //to be changed (now ip+port+nick/room to join + botNick)
-        printf("Wrong number of args\n");
+        perror("Wrong number of args\n");
         exit(1);
     }
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     addr.sin_family = AF_INET;
     addr.sin_port = htons(atoi(argv[2]));
     if(!inet_aton(argv[1], &(addr.sin_addr))){
-        printf("IP-convertation error\n");
+        perror("IP-convertation error\n");
         exit(1);
     }
     if(0 != connect(sockfd, (struct sockaddr *)&addr, sizeof(addr))){
-        printf("Connection error\n");
+        perror("Connection error\n");
         exit(1);
     }
     prepare4Game(sockfd, argv, argc);
