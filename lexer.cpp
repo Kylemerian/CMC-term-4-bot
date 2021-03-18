@@ -33,7 +33,7 @@ enum typesL
     K,
     A,
     S,
-    O
+    Q
 };
 
 struct list
@@ -70,6 +70,7 @@ class lexer
 {
     char * buf;
     int size;
+    int capacity;
     int line;
     list * lexems;
     void number();
@@ -77,30 +78,48 @@ class lexer
     void keyword();
     void quote();
     void assign();
+    void resize();
     list * addToList(char * key, int line, int type);
+    void printList(list * head);
+    void print()
+    {
+        list * tmp = lexems;
+        printList(tmp);
+    }
 public:
     lexer()
     {
-        buf = (char *)malloc(1024);
+        capacity = 256;
+        buf = (char *)malloc(capacity);
         size = 0;
         buf[0] = 0;
         lexems = NULL;
         line = 1;
     }
     void start();
-    void print()
+    ~lexer()
     {
-        list * tmp = lexems;
-        printList(tmp);
-    }
-    void printList(list * head)
-    {
-        if (head != NULL) {
-            printList(head -> next);
-            printf("line %2d type = %13s   %s\n", head -> line, typeLex[head -> type], head -> lex);
-        }
+        free(buf);
     }
 };
+
+void lexer::resize()
+{
+    char * tmp = (char *)malloc(capacity * 2);
+    strncpy(tmp, buf, capacity);
+    capacity *= 2;
+    free(buf);
+    buf = tmp;
+}
+
+void lexer::printList(list * head)
+{
+    if (head != NULL) {
+        printList(head -> next);
+        printf("line %2d type = %13s   %s\n", head -> line, 
+            typeLex[head -> type], head -> lex);
+    }
+}
 
 list * lexer::addToList(char * key, int line, int type)
 {
@@ -138,7 +157,7 @@ void lexer::start()
             ident();
             break;
         case op:
-            lexems = addToList(buf, line, O);
+            lexems = addToList(buf, line, Q);
             size = 0;
             start();
             break;
@@ -157,6 +176,8 @@ void lexer::start()
 void lexer::number()
 {
     int c = getchar();
+    if(size == capacity)
+        resize();
     int type = defineType(c);
     buf[size] = c;
     size++;
@@ -170,22 +191,25 @@ void lexer::number()
             buf[size] = c;
             buf[size + 1] = 0;
             lexems = addToList(buf, line, N);
-            lexems = addToList(&buf[size], line, O);
+            lexems = addToList(&buf[size], line, Q);
         }
         else{
             lexems = addToList(buf, line, N);
-            line++;
+            if(c == '\n')
+                line++;
         }
         size = 0;
         start();
         return;
     }
-    return;
+    //throw line;
 }
 
 void lexer::ident()
 {
     int c = getchar();
+    if(size == capacity)
+        resize();
     int type = defineType(c);
     buf[size] = c;
     size++;
@@ -199,22 +223,25 @@ void lexer::ident()
             buf[size] = c;
             buf[size + 1] = 0;
             lexems = addToList(buf, line, I);
-            lexems = addToList(&buf[size], line, O);
+            lexems = addToList(&buf[size], line, Q);
         }
         else{
             lexems = addToList(buf, line, I);
-            line++;
+            if(c == '\n')
+                line++;
         }
         size = 0;
         start();
         return;
     }
-    return;
+    //throw line;
 }
 
 void lexer::keyword()
 {
     int c = getchar();
+    if(size == capacity)
+        resize();
     int type = defineType(c);
     buf[size] = c;
     size++;
@@ -228,22 +255,25 @@ void lexer::keyword()
             buf[size] = c;
             buf[size + 1] = 0;
             lexems = addToList(buf, line, K);
-            lexems = addToList(&buf[size], line, O);
+            lexems = addToList(&buf[size], line, Q);
         }
         else{
             lexems = addToList(buf, line, K);
-            line++;
+            if(c == '\n')
+                line++;
         }
         size = 0;
         start();
         return;
     }
-    return;
+    //throw line;
 }
 
 void lexer::quote()
 {
     int c = getchar();
+    if(size == capacity)
+        resize();
     int type = defineType(c);
     buf[size] = c;
     size++;
@@ -252,14 +282,20 @@ void lexer::quote()
         lexems = addToList(buf, line, S);
         size = 0;
         start();
+        return;
     }
-    else
+    else if(c != EOF){
         quote();
+        return;
+    }
+    throw line;
 }
 
 void lexer::assign()
 {
     int c = getchar();
+    if(size == capacity)
+        resize();
     int type = defineType(c);
     buf[size] = c;
     size++;
@@ -270,18 +306,23 @@ void lexer::assign()
         start();
         return;
     }
-    return;
+    throw line;
 }
 
 int main(int argc, char ** argv){
     int fd[2];
     fd[0] = open(argv[1], O_RDONLY);
-    //fd[1] = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC, 0777);
+    fd[1] = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC, 0777);
     dup2(fd[0], 0);
-    //dup2(fd[1], 1);
-    //close(fd[1]);
+    dup2(fd[1], 1);
+    close(fd[1]);
     close(fd[0]);
     lexer a;
-    a.start();
+    try{
+        a.start();
+    }
+    catch(int nm){
+        printf("incorrect on %d\n", nm);
+    }
     return 0;
 }
