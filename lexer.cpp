@@ -12,7 +12,9 @@ const char * typeLex[] = {
     "assign",
     "quote",
     "operator",
-    "index"
+    "index",
+    "arg",
+    "callbracket"
 };
 
 enum typesS
@@ -26,7 +28,9 @@ enum typesS
     dots,
     quotes,
     idxl,
-    idxr
+    idxr,
+    funcl,
+    funcr
 };
 
 enum typesL
@@ -37,7 +41,9 @@ enum typesL
     A,
     S,
     Q,
-    IDX
+    IDX,
+    ARG,
+    CLL
 };
 
 struct list
@@ -50,7 +56,7 @@ struct list
 
 int defineType(int c)
 {
-    if(c == ' ' || c == '\t' || c == '\n' || c == ';')
+    if(c == ' ' || c == '\t' || c == '\n' || c == ';' || c == ',')
         return sep;
     if(c >='0' && c <= '9')
         return digit;
@@ -71,6 +77,10 @@ int defineType(int c)
         return idxl;
     if(c == ']')
         return idxr;
+    if(c == ')')
+        return funcr;
+    if(c == '(')
+        return funcl;
     return -1;
 }
 
@@ -78,10 +88,13 @@ class lexer
 {
     char * buf;
     int size;
+    int type;
+    int c;
     int capacity;
     int line;
     list * lexems;
     void freemem();
+    void getChar();
     void number();
     void ident();
     void keyword();
@@ -91,6 +104,8 @@ class lexer
     void index();
     void resize();
     void error();
+    void funccall();
+    void funcArg();
     list * addToList(char * key, int line, int type);
     void printList(list * head);
     void print()
@@ -112,6 +127,16 @@ public:
     ~lexer();
 };
 
+void lexer::getChar()
+{
+    c = getchar();
+    if(size == capacity)
+        resize();
+    type = defineType(c);
+    buf[size] = c;
+    size++;
+}
+
 void lexer::freemem()
 {
     if (lexems != NULL) {
@@ -124,7 +149,6 @@ void lexer::freemem()
     }
 }
 
-
 lexer::~lexer()
 {
     freemem();
@@ -134,7 +158,7 @@ lexer::~lexer()
 void lexer::error()
 {
     //printf("%s\n", buf);
-    printf("zxc on %d\n", line);
+    printf("error on line %d\n", line);
 }
 
 void lexer::resize()
@@ -173,16 +197,13 @@ void lexer::start()
         assign();
         return;
     }
-    int c = getchar();
-    buf[size] = c;
-    int type = defineType(c);
+    getChar();
     (c == '\n') ? line++: 0;
     if(type == sep){
+        size = 0;
         start();
         return;
     }
-    size++;
-    buf[size] = 0;
     if(type == digit)
         number();
     else if(type == alpha)
@@ -207,12 +228,7 @@ void lexer::start()
 
 void lexer::number()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == digit){
         number();
         return;
@@ -238,12 +254,7 @@ void lexer::number()
 
 void lexer::indNum()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == digit)
         indNum();
     else if(type == idxr){
@@ -259,43 +270,80 @@ void lexer::indNum()
         error();
 }
 
+void lexer::funcArg()
+{
+    getChar();
+    if(type == funcr){
+        buf[size - 1] = 0;
+        buf[size] = c;
+        buf[size + 1] = 0;
+        lexems = addToList(buf, line, ARG);
+        lexems = addToList(&buf[size], line, CLL);
+        size = 0;
+        start();
+    }
+    else if(type == sep){
+        buf[size - 1] = 0;
+        if(size != 1)
+            lexems = addToList(buf, line, ARG);
+        size = 0;
+        funcArg();
+    }
+    else if(type == alpha || type == digit)
+        funcArg();
+    else
+        error();
+}
+
 void lexer::index()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == digit)
         indNum();
+    else
+        error();
+}
+
+void lexer::funccall()
+{
+    getChar();
+    if(type == digit || type == alpha)
+        funcArg();
     else error();
 }
 
 void lexer::ident()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == digit || type == alpha)
         ident();
-    else if(type == op || type == sep || type == eq || type == idxl){
+    else if(type == op||type == sep||type == eq||type == idxl||type == funcl){
         buf[size - 1] = 0;
-        if(type == op || type == eq || type == idxl){
+        if(type == op || type == eq || type == idxl || type == funcl){
             buf[size] = c;
             buf[size + 1] = 0;
             lexems = addToList(buf, line, I);
-            type == idxl ? lexems = addToList(&buf[size], line, IDX) : lexems = addToList(&buf[size], line, Q);
+            if(type == idxl && buf[0] == '$')
+                lexems = addToList(&buf[size], line, IDX);
+            else if(type == funcl && buf[0] == '?')
+                lexems = addToList(&buf[size], line, CLL);
+            else if(type == funcl || type == idxl){
+                error();
+                return;
+            }
+            else
+                lexems = addToList(&buf[size], line, Q);
         }
         else{
             lexems = addToList(buf, line, I);
             (c == '\n') ? line++: 0;
         }
         size = 0;
-        (type == idxl) ? index() : start();
+        if(type == idxl)
+            index();
+        else if(type == funcl)
+            funccall();
+        else start();
     }
     else if(type == dots){
         buf[size - 1] = 0;
@@ -304,18 +352,12 @@ void lexer::ident()
         buf[0] = c;
         start();
     }
-    else
-        error();
+    else error();
 }
 
 void lexer::keyword()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == alpha){
         keyword();
         return;
@@ -341,12 +383,7 @@ void lexer::keyword()
 
 void lexer::quote()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == quotes){
         buf[size] = 0;
         lexems = addToList(buf, line, S);
@@ -363,12 +400,7 @@ void lexer::quote()
 
 void lexer::assign()
 {
-    int c = getchar();
-    if(size == capacity)
-        resize();
-    int type = defineType(c);
-    buf[size] = c;
-    size++;
+    getChar();
     if(type == eq){
         buf[size] = 0;
         lexems = addToList(buf, line, A);
@@ -380,13 +412,6 @@ void lexer::assign()
 }
 
 int main(int argc, char ** argv){
-    int fd[2];
-    fd[0] = open(argv[1], O_RDONLY);
-    fd[1] = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC, 0777);
-    dup2(fd[0], 0);
-    dup2(fd[1], 1);
-    close(fd[1]);
-    close(fd[0]);
     lexer a;
     a.start();
     return 0;
