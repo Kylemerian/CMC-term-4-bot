@@ -73,6 +73,7 @@ class lexer{
     int capacity;
     int line;
     int status;
+    list * curLex;
     list * lexems;
     void number();
     void ident();
@@ -83,19 +84,38 @@ class lexer{
     void error();
     void resize();
     list * addToList(char * key, int line, int type);
-    void printList(list * head);
     void freemem();
+    void reverse();
 public:
-    void print()
-    {
-        list * tmp = lexems;
-        printList(tmp);
-    };
+    list * getLex();
+    void print();
     lexer();
-    void setChar(int ac);
+    void sendChar(int ac);
     void switcher();
     ~lexer();
 };
+
+void lexer::print()
+{
+    reverse();
+    list * tmp = lexems;
+    while(tmp){
+        printf("line %2d type = %13s   %s\n", tmp -> line, 
+            typeLex[tmp -> type], tmp -> lex);
+        tmp = tmp -> next;
+    }
+}
+
+void lexer::reverse()
+{
+    list * rev = NULL;
+    for(list * qq = lexems, *next_node; qq != NULL; qq = next_node){
+        next_node = qq->next;
+        qq -> next = rev;
+        rev = qq;
+    }
+    lexems = rev;
+}
 
 void lexer::freemem()
 {
@@ -106,15 +126,6 @@ void lexer::freemem()
         lexems = lexems -> next;
         delete tmp;
         freemem();
-    }
-}
-
-void lexer::printList(list * head)
-{
-    if (head != NULL) {
-        printList(head -> next);
-        printf("line %2d type = %13s   %s\n", head -> line, 
-            typeLex[head -> type], head -> lex);
     }
 }
 
@@ -137,8 +148,6 @@ void lexer::number()
         buf[size - 1] = 0;
         buf[size + 1] = 0;
         lexems = addToList(buf, line, N);
-        //printf("line = %d  %s\n", line, buf);
-        //printf("%s\n", &buf[size]);
         buf[0] = buf[size];
         size = 1;
         status = H;
@@ -146,7 +155,6 @@ void lexer::number()
     else if(type == sep){
         buf[size - 1] = 0;
         lexems = addToList(buf, line, N);
-        //printf("line = %d  %s\n", line, buf);
         size = 0;
         status = H;
     }
@@ -158,13 +166,11 @@ void lexer::number()
 
 void lexer::ident()
 {
-    if(type == op || type == eq){
+    if(type == op || type == eq || type == dots){
         buf[size] = buf[size - 1];
         buf[size - 1] = 0;
         buf[size + 1] = 0;
         lexems = addToList(buf, line, I);
-        //printf("line = %d  %s\n", line, buf);
-        //printf("%s\n", &buf[size]);
         buf[0] = buf[size];
         size = 1;
         status = H;
@@ -172,7 +178,6 @@ void lexer::ident()
     else if(type == sep){
         buf[size - 1] = 0;
         lexems = addToList(buf, line, I);
-        //printf("line = %d  %s\n", line, buf);
         size = 0;
         status = H;
     }
@@ -189,8 +194,6 @@ void lexer::keyword()
         buf[size - 1] = 0;
         buf[size + 1] = 0;
         lexems = addToList(buf, line, K);
-        //printf("line = %d  %s\n", line, buf);
-        //printf("%s\n", &buf[size]);
         buf[0] = buf[size];
         size = 1;
         status = H;
@@ -198,7 +201,6 @@ void lexer::keyword()
     else if(type == sep){
         buf[size - 1] = 0;
         lexems = addToList(buf, line, K);
-        //printf("line = %d  %s\n", line, buf);
         size = 0;
         status = H;
     }
@@ -214,7 +216,6 @@ void lexer::assign()
     if(type == eq){
         buf[size] = 0;
         lexems = addToList(buf, line, A);
-        //printf("line = %d  %s\n", line, buf);
         size = 0;
         status = H;
     }
@@ -227,7 +228,6 @@ void lexer::str()
     if(type == quote){
         buf[size] = 0;
         lexems = addToList(buf, line, Str);
-        //printf("line = %d  %s\n", line, buf);
         size = 0;
         status = H;
     }
@@ -237,18 +237,21 @@ void lexer::str()
 
 void lexer::start()
 {
+    if(size == 2 && defType(buf[0]) == dots){
+        status = A;
+        assign();
+        return;
+    }
     if(size == 2){
         buf[size] = buf[size - 1]; 
         buf[size - 1] = 0;
         lexems = addToList(buf, line, H);
-        //printf("line = %d  %s\n", line, buf);
         buf[0] = buf[size];
         size = 1;
     }
     if((type == op || type == eq) && size == 1){
         buf[1] = 0;
         lexems = addToList(buf, line, H);
-        //printf("line = %d  %s\n", line, buf);
         status = H;
         size = 0;
     }
@@ -295,12 +298,14 @@ void lexer::switcher()
 
 void lexer::error()
 {
+    //printf("%s line %d status %d\n", buf, line, status);
     status = E;
 }
 
 lexer::lexer()
 {
     lexems = NULL;
+    curLex = lexems;
     capacity = 256;
     buf = new char (capacity);
     size = 0;
@@ -309,7 +314,7 @@ lexer::lexer()
     status = H;
 }
 
-void lexer::setChar(int c)
+void lexer::sendChar(int c)
 {
     if(size == capacity)
         resize();
@@ -317,6 +322,7 @@ void lexer::setChar(int c)
     buf[size] = c;
     size++;
     (c == '\n') ? line++: 0;
+    switcher();
 }
 
 void lexer::resize()
@@ -338,12 +344,10 @@ int main()
     int c;
     lexer obj;
     while((c = getchar()) != EOF){
-        obj.setChar(c);
-        obj.switcher();
+        obj.sendChar(c);
     }
     c = ' ';
-    obj.setChar(c);
-    obj.switcher();
+    obj.sendChar(c);
     obj.print();
     return 0;
 }
