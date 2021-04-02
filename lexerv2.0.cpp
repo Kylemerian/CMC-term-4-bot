@@ -73,8 +73,10 @@ class lexer{
     int capacity;
     int line;
     int status;
+    int initCur;
     list * curLex;
     list * lexems;
+    void switcher();
     void number();
     void ident();
     void keyword();
@@ -90,10 +92,22 @@ public:
     list * getLex();
     void print();
     lexer();
-    void sendChar(int ac);
-    void switcher();
+    void sendChar(int c);
     ~lexer();
 };
+
+list * lexer::getLex()
+{
+    if(!initCur){
+        reverse();
+        curLex = lexems;
+        initCur = !initCur;
+    }
+    list * tmp = curLex;
+    if(curLex)
+        curLex = curLex -> next;
+    return tmp;
+}
 
 void lexer::print()
 {
@@ -304,6 +318,7 @@ void lexer::error()
 
 lexer::lexer()
 {
+    initCur = 0;
     lexems = NULL;
     curLex = lexems;
     capacity = 256;
@@ -336,6 +351,7 @@ void lexer::resize()
 
 lexer::~lexer()
 {
+    freemem();
     delete[] buf;
 }
 
@@ -343,11 +359,20 @@ int main()
 {
     int c;
     lexer obj;
-    while((c = getchar()) != EOF){
+    while((c = getchar()) != EOF)
         obj.sendChar(c);
-    }
     c = ' ';
     obj.sendChar(c);
-    obj.print();
+    
+    /*obj.print();*/
+
+    /*
+    list * tmp = obj.getLex();
+    while(tmp){
+        printf("line %2d type = %13s   %s\n", tmp -> line, 
+            typeLex[tmp -> type], tmp -> lex);
+        tmp = obj.getLex();
+    }
+    */
     return 0;
 }
