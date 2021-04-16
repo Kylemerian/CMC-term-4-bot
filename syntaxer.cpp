@@ -8,6 +8,11 @@ int isFunc(char * a)
     return a[0] == '?';
 }
 
+int isVar(char * a)
+{
+    return a[0] == '$';
+}
+
 class error
 {
     list * curlex;
@@ -50,6 +55,9 @@ class syntaxer
     void buy_sell_hdl();
     void prod_hdl();
     void turn_hdl();
+    void body_hdl();
+    void func_hdl();
+    void safeGetLex(const char * str);
     int equalStr(const char * a, const char * b) const;
 public:
     void checkSeq(list * lexems);
@@ -66,193 +74,175 @@ int syntaxer::equalStr(const char * a, const char * b) const
     return !strcmp(a, b);
 }
 
-void syntaxer::exp_hdl() //OK
+void syntaxer::safeGetLex(const char * str)
 {
-    //printf("was here in exp with %s\n", lexems -> lex);
+    if(!lexems -> next)
+        throw error (lexems, str);
+    lexems = lexems -> next;
+}
+
+void syntaxer::exp_hdl()
+{
     operand_hdl();
     if(lexems -> type == H){
-        if(lexems) lexems = lexems -> next;
-        else throw error(lexems, "No operand after operator in expression");
+        safeGetLex("No operand in expression");
         exp_hdl();
-    }   
+    }
 }
 
-void syntaxer::assign_hdl() //OK
+void syntaxer::assign_hdl()
 {
     var_hdl();
-    //printf("was here in assign with %s\n", lexems -> lex);
-    if(equalStr(lexems ->lex, ":=")){
-        if(lexems) lexems = lexems -> next;
-        else throw error(lexems, "No expression after :=");
-        exp_hdl();
-        lexems = lexems -> next;
-    }
-    else
-        throw error(lexems, "No \":=\" in assigning");
-
-
+    if(!equalStr(lexems -> lex, ":="))
+        throw error(lexems, "No := in assign");
+    safeGetLex("No expression after :=");
+    exp_hdl();
+    if(!equalStr(lexems -> lex, ";"))
+        throw error(lexems, "No ; after statement");
+    lexems = lexems -> next;
 }
 
-void syntaxer::var_hdl()   //OK
+void syntaxer::var_hdl()
 {
-    //printf("was here in var with %s\n", lexems -> lex);
-    if(lexems -> type == I){
-        if(equalStr(lexems -> next ->lex, "[")){
-            lexems = lexems -> next;
-            if(lexems) lexems = lexems -> next;
-            else throw error(lexems, "No ] in var with index");
-            exp_hdl();
-            //printf("was here in var with %s\n", lexems -> lex);
-            if(equalStr(lexems ->lex, "]")){
-                lexems = lexems -> next;
-                return;
-            }
-            else
-                throw error(lexems, "No ] in var with index");
-        }
-        else{
-            lexems = lexems -> next;
-            return;
-        }
-    }
-    else
-        throw error(lexems, "There must be an operand");
-
+    lexems = lexems -> next; //could be problem
+    if(!equalStr(lexems -> lex, "["))
+        return;
+    safeGetLex("No expression in []");
+    exp_hdl();
+    if(!equalStr(lexems -> lex, "]"))
+        throw error(lexems, "No ] in var indexing");
+    lexems = lexems -> next;
 }
 
-void syntaxer::operand_hdl()    //OK   
+void syntaxer::func_hdl()
 {
-    //printf("was here in oper with %s\n", lexems -> lex);
-    if(!lexems)
-        throw error(lexems, "No expression");
-    if(lexems -> type == N)
+    safeGetLex("No ( in function call");
+    if(!equalStr(lexems -> lex, "("))
+        throw error(lexems, "No () in function call");
+    safeGetLex("No ) in function call");
+    if(equalStr(lexems -> lex, ")")){
         lexems = lexems -> next;
-    else if(isFunc(lexems -> lex)){
-        if(lexems) lexems = lexems -> next;
-        else throw error(lexems, "No () in func call");
-        if(equalStr(lexems -> lex, "(")){
-            if(lexems) lexems = lexems -> next;
-            else throw error(lexems, "No ) in func call");
-            if(!equalStr(lexems -> lex, ")"))
-                exp_hdl();
-            if(!equalStr(lexems -> lex, ")"))
-                exp_hdl();
-            //printf("was here in oper with %s\n", lexems -> lex);
-            if(equalStr(lexems -> lex, ")")){
-                lexems = lexems -> next;
-                return;
-            }
-            else
-                throw error(lexems, "No ) in func call or more than 2 args");
-        }
-        else
-            throw error(lexems, "No ( in func call");
+        return;
     }
-    else
+    exp_hdl();
+    if(equalStr(lexems -> lex, ")")){
+        lexems = lexems -> next;
+        return;
+    }
+    exp_hdl();
+    if(!equalStr(lexems -> lex, ")"))
+        throw error(lexems, "No ) in function call");
+    lexems = lexems -> next;
+}
+
+void syntaxer::operand_hdl()
+{
+    if(lexems -> type == N){
+        lexems = lexems -> next; //TODO     safe operand or next statement
+    }
+    else if(isVar(lexems -> lex))
         var_hdl();
-}
-
-void syntaxer::if_hdl() //OK
-{
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No condition in if statement");
-    exp_hdl();
-    //printf("was here in if with %s\n", lexems -> lex);
-    if(equalStr(lexems -> lex, "then")){
-        if(lexems) lexems = lexems -> next;
-        else throw error(lexems, "No {} in if statement");
-        if(equalStr(lexems -> lex, "{")){
-            if(lexems) lexems = lexems -> next;
-            else throw error(lexems, "No } in if statement");
-            statement_hdl();
-            //printf("was here in if need } with %s\n", lexems -> lex);
-            if(equalStr(lexems -> lex, "}")){
-                lexems = lexems -> next;
-                //printf("was here in if } with %s\n", lexems -> lex);
-                return;
-            }
-            else
-                throw error(lexems, "No } in if statement");
-        }
-        else
-            throw error(lexems, "No { in if statement");
-    }
+    else if(isFunc(lexems -> lex))
+        func_hdl();
     else
-        throw error(lexems, "No \"then\" in if statement");
+        throw error(lexems, "incorrect operand");
 }
 
-void syntaxer::while_hdl()  //OK
+void syntaxer::if_hdl()
 {
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No condition in while statement");
+    safeGetLex("No expression");
     exp_hdl();
-    //printf("was here in while with %s\n", lexems -> lex);
-    if(equalStr(lexems -> lex, "do")){
-        if(lexems) lexems = lexems -> next;
-        else throw error(lexems, "No {} in while statement");
-        if(equalStr(lexems -> lex, "{")){
-            if(lexems) lexems = lexems -> next;
-            else throw error(lexems, "No } in while statement");
-            statement_hdl();
-            //printf("was here in while need } with %s\n", lexems -> lex);
-            if(equalStr(lexems -> lex, "}")){
-                lexems = lexems -> next;
-                //printf("was here in if } with %s\n", lexems -> lex);
-                return;
-            }
-            else
-                throw error(lexems, "No } in while statement");
-        }
-        else
-            throw error(lexems, "No { in while statement");
-    }
-    else
-        throw error(lexems, "No \"do\" in while statement");
+    if(!equalStr(lexems -> lex, "then"))
+        throw error(lexems, "No do in if statement");
+    safeGetLex("No { in if statement");
+    if(!equalStr(lexems -> lex, "{"))
+        throw error(lexems, "No { in if statement");
+    safeGetLex("No } in if statement");
+    statement_hdl();
+    if(!equalStr(lexems -> lex, "}"))
+        throw error(lexems, "No } in if statement");
+    lexems = lexems -> next;
 }
 
+void syntaxer::while_hdl()
+{
+    safeGetLex("No expression");
+    exp_hdl();
+    if(!equalStr(lexems -> lex, "do"))
+        throw error(lexems, "No do in while statement");
+    safeGetLex("No { in while statement");
+    if(!equalStr(lexems -> lex, "{"))
+        throw error(lexems, "No { in while statement");
+    safeGetLex("No } in while statement");
+    body_hdl();
+    if(!equalStr(lexems -> lex, "}"))
+        throw error(lexems, "No } in while statement");
+    lexems = lexems -> next;
+}
+/*
 void syntaxer::buy_sell_hdl()
 {
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No args after func call");
+    safeGetLex("No arg in function call");
     exp_hdl();
     exp_hdl();
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No ; after statement");
+    if(!equalStr(lexems -> lex, ";"))
+        throw error(lexems, "No ; after statement");
+    lexems = lexems -> next;
 }
 
 void syntaxer::prod_hdl()
 {
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No args after func call");
+    safeGetLex("No arg in function call");
     exp_hdl();
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No ; after statement");
+    if(!equalStr(lexems -> lex, ";"))
+        throw error(lexems, "No ; after statement");
+    lexems = lexems -> next;
 }
 
 void syntaxer::turn_hdl()
 {
-    if(lexems) lexems = lexems -> next;
-    else throw error(lexems, "No ; after statement");
+    safeGetLex("No ; after statement");
+    if(!equalStr(lexems -> lex, ";"))
+        throw error(lexems, "No ; after statement");
     lexems = lexems -> next;
 }
-
-void syntaxer::statement_hdl() //OK
+*/
+void syntaxer::body_hdl()
 {
     if(!lexems)
-        throw error(lexems, "Wrong statement");
+        return;
+    if(equalStr(lexems -> lex, "}"))
+        return;
+    if(lexems){
+        statement_hdl();
+        body_hdl();
+    }
+}
+
+void syntaxer::statement_hdl()
+{
     if(equalStr(lexems -> lex, "while"))
         while_hdl();
     else if(equalStr(lexems -> lex, "if"))
-        //printf("was in state with %s\n", lexems -> lex);
         if_hdl();
-    else if(equalStr(lexems -> lex, "buy") || equalStr(lexems -> lex, "sell"))
+    else if(isFunc(lexems -> lex)){
+        func_hdl();
+        if(!equalStr(lexems -> lex, ";")){
+            printf("%s \n", lexems -> lex);
+            throw error(lexems, "No ;;;; after statement");
+        }
+        lexems = lexems -> next;
+    }
+    /*else if(equalStr(lexems -> lex, "?buy") || equalStr(lexems -> lex, "?sell"))
         buy_sell_hdl();
-    else if(equalStr(lexems -> lex, "prod"))
+    else if(equalStr(lexems -> lex, "?prod"))
         prod_hdl();
-    else if(equalStr(lexems -> lex, "endturn"))
-        turn_hdl(); 
-    else if(lexems -> type == I)
+    else if(equalStr(lexems -> lex, "?endturn"))
+        turn_hdl();*/
+    else if(isVar(lexems -> lex))
         assign_hdl();
+    else if(!equalStr(lexems -> lex, "}"))
+        throw error(lexems, "Incorrect statement");
 }
 
 void syntaxer::checkSeq(list * qlexems)
@@ -260,10 +250,7 @@ void syntaxer::checkSeq(list * qlexems)
     lexems = qlexems;
     int err = 0;
     try{
-        while(lexems){/**/
-            statement_hdl();
-            //printf("was here in checkseq with %s\n", lexems -> lex);
-        }
+        body_hdl();
     }
     catch(error & a)
     {
@@ -283,10 +270,8 @@ int main()
         obj.sendChar(c);
     c = ' ';
     obj.sendChar(c);
-    
     obj.print();
     syntax.checkSeq(obj.getLexList());
-    
     return 0;
 }
 
