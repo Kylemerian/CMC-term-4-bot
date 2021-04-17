@@ -50,9 +50,6 @@ class syntaxer
     void statement_hdl();
     void while_hdl();
     void if_hdl();
-    void buy_sell_hdl();
-    void prod_hdl();
-    void turn_hdl();
     void body_hdl();
     void func_hdl();
     void exp0_hdl();
@@ -61,6 +58,9 @@ class syntaxer
     void exp3_hdl();
     void exp4_hdl();
     void exp5_hdl();
+    void print_hdl();
+    void pr_list_hdl();
+    void pr_elem_hdl();
     void checkError(const char * str);
     void safeGetLex(const char * str);
     int equalStr(const char * a, const char * b) const;
@@ -95,7 +95,6 @@ void syntaxer::safeGetLex(const char * str)
 
 void syntaxer::exp_hdl()
 {
-    //printf("was in exp with %s\n", lexems -> lex);
     exp5_hdl();
     if(!lexems)
         return;
@@ -107,7 +106,6 @@ void syntaxer::exp_hdl()
 
 void syntaxer::exp5_hdl()
 {
-    //printf("was in exp5 with %s\n", lexems -> lex);
     exp4_hdl();
     if(!lexems)
         return;
@@ -119,7 +117,6 @@ void syntaxer::exp5_hdl()
 
 void syntaxer::exp4_hdl()
 {
-    //printf("was in exp4 with %s\n", lexems -> lex);
     exp3_hdl();
     if(!lexems)
         return;
@@ -133,7 +130,6 @@ void syntaxer::exp4_hdl()
 
 void syntaxer::exp3_hdl()
 {
-    //printf("was in exp3 with %s\n", lexems -> lex);
     exp2_hdl();
     if(!lexems)
         return;
@@ -145,7 +141,6 @@ void syntaxer::exp3_hdl()
 
 void syntaxer::exp2_hdl()
 {
-    //printf("was in exp2 with %s\n", lexems -> lex);
     exp1_hdl();
     if(!lexems)
         return;
@@ -159,7 +154,6 @@ void syntaxer::exp2_hdl()
 
 void syntaxer::exp1_hdl()
 {
-    //printf("was in exp1 with %s\n", lexems -> lex);
     if(equalStr(lexems -> lex, "not") || equalStr(lexems -> lex, "-"))
         safeGetLex("No operand");
     exp0_hdl();
@@ -167,7 +161,6 @@ void syntaxer::exp1_hdl()
 
 void syntaxer::exp0_hdl()
 {
-    //printf("was in exp0 with %s\n", lexems -> lex);
     if(!equalStr(lexems -> lex, "(")){
         operand_hdl();
         return;
@@ -199,7 +192,7 @@ void syntaxer::assign_hdl()
 void syntaxer::var_hdl()
 {
     errline = lexems -> line;
-    lexems = lexems -> next;//could be problem
+    lexems = lexems -> next;
     if(!equalStr(lexems -> lex, "["))
         return;
     safeGetLex("No expression in []");
@@ -239,10 +232,9 @@ void syntaxer::func_hdl()
 
 void syntaxer::operand_hdl()
 {
-    //printf("ope = %s\n", lexems -> lex);
     if(lexems -> type == N){
         errline = lexems -> line;
-        lexems = lexems -> next; //TODO     safe operand or next statement
+        lexems = lexems -> next; 
     }
     else if(isVar(lexems -> lex))
         var_hdl();
@@ -290,6 +282,38 @@ void syntaxer::while_hdl()
     lexems = lexems -> next;
 }
 
+void syntaxer::pr_list_hdl()
+{
+    pr_elem_hdl();
+    if(!lexems)
+        return;
+    if(equalStr(lexems -> lex, ",")){
+        safeGetLex("No arg after ,");
+        pr_list_hdl();
+    }
+}
+    
+void syntaxer::pr_elem_hdl()
+{
+    if(lexems -> type == Str){
+        errline = lexems -> line;
+        lexems = lexems -> next;
+        return;
+    }
+    exp_hdl();
+}
+
+void syntaxer::print_hdl()
+{
+    safeGetLex("No args for print");
+    pr_list_hdl();
+    checkError("No ; after statement");
+    if(!equalStr(lexems -> lex, ";"))
+        throw error(lexems -> line, "No ; after statement");
+    errline = lexems -> line;
+    lexems = lexems -> next;
+}
+
 void syntaxer::body_hdl()
 {
     if(!lexems)
@@ -306,6 +330,8 @@ void syntaxer::statement_hdl()
 {
     if(equalStr(lexems -> lex, "while"))
         while_hdl();
+    else if(equalStr(lexems -> lex, "print"))
+        print_hdl();
     else if(equalStr(lexems -> lex, "if"))
         if_hdl();
     else if(isFunc(lexems -> lex)){
