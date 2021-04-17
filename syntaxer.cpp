@@ -3,11 +3,6 @@
 #include <stdio.h>
 #include "lexer.h"
 
-int isFunc(char * a)
-{
-    return a[0] == '?';
-}
-
 int isVar(char * a)
 {
     return a[0] == '$';
@@ -63,11 +58,18 @@ class syntaxer
     void pr_elem_hdl();
     void checkError(const char * str);
     void safeGetLex(const char * str);
+    int isFunc(char * str);
     int equalStr(const char * a, const char * b) const;
 public:
     void checkSeq(list * lexems);
     syntaxer();
 };
+
+int syntaxer::isFunc(char * str)
+{
+    return equalStr(str, "?sell") || equalStr(str, "?buy") ||
+        equalStr(str, "?prod") || equalStr(str, "?endturn"); 
+}
 
 syntaxer::syntaxer()
 {
