@@ -102,6 +102,7 @@ public:
     lexer();
     void sendChar(int c);
     ~lexer();
+    int hasError();
 };
 /*
 list * lexer::getLex()
@@ -361,9 +362,10 @@ void lexer::sendChar(int c)
     type = defType(c);
     buf[size] = c;
     size++;
-    if(c == '\n')
-        line++; 
+    //printf("char = %c line = %d\n", c, line);
     switcher();
+    if(c == '\n')
+        line++;
 }
 
 void lexer::resize()
@@ -381,6 +383,11 @@ lexer::~lexer()
     delete[] buf;
 }
 
+int lexer::hasError()
+{
+    return status == E;
+}
+/*
 int main()
 {
     int c;
@@ -392,3 +399,4 @@ int main()
     obj.print();
     return 0;
 }
+*/

@@ -55,9 +55,10 @@ class lexer{
     void resize();
     list * addToList(char * key, int line, int type);
     void freemem();
-    void reverse();
 public:
     //list * getLex();
+    void reverse();
+    int hasError();
     void print();
     list * getLexList();
     lexer();
