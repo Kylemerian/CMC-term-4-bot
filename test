@@ -1,0 +1,11 @@
+while -(2 * 2 + 2 - 2 / 2 > 5 or not(2 * 2 + 2 - 2 / 2))  do {
+	while 2 do {
+		while 2 do {
+			$a:=234+324;
+		}
+		?endturn();
+		?sell(7 12);
+	}
+}
+?prod ($b[32423]);
+print;

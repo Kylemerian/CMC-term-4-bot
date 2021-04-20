@@ -167,6 +167,21 @@ public:
     }
 };
 
+class RPNFunUnoMinus : public RPNFunction{
+public:
+    RPNFunUnoMinus(){}
+    virtual ~RPNFunUnoMinus(){}
+    RPNElem* EvaluateFun(RPNItem ** stack) const{
+        	RPNElem *op1 = pop(stack);
+        	RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        	if (!i1)
+                throw op1;
+        	int res = -(i1 -> get());
+       	 	delete op1;
+        	return new RPNInt(res);
+    }
+};
+
 class RPNFunMinus : public RPNFunction
 {
     RPNFunMinus() {};
@@ -366,5 +381,5 @@ class RPNFunAssign : public RPNFunction
 {
     RPNFunAssign() {};
     virtual ~RPNFunAssign(){};
-    
+
 };

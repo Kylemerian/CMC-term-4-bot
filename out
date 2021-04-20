@@ -1,0 +1,26 @@
+line  1 type = identificator   $name
+line  1 type =         index   [
+line  1 type =        number   212
+line  1 type =         index   ]
+line  1 type =        assign   :=
+line  1 type =        number   2
+line  1 type =      operator   +
+line  1 type =        number   2
+line  2 type = identificator   $name
+line  2 type =         index   [
+line  2 type =        number   1214
+line  2 type =         index   ]
+line  2 type =        assign   :=
+line  2 type =        number   2
+line  2 type =      operator   *
+line  2 type =        number   0
+line  3 type =       keyword   if
+line  3 type =       keyword   true
+line  3 type = identificator   ?print
+line  4 type =       keyword   else
+line  4 type =         quote   "ada sd;	"
+line  5 type = identificator   ?werwer
+line  5 type =   callbracket   (
+line  5 type =           arg   werwer
+line  5 type =           arg   2342343
+line  5 type =   callbracket   )

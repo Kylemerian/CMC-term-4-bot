@@ -1,0 +1,17 @@
+all: analys
+
+analys: syntaxer.o lexer.o rpn.o
+	g++ syntaxer.o lexer.o rpn.o -g -Wall -o analys
+	rm -rf *.o
+
+syntaxer.o: syntaxer.cpp
+	g++ -c -Wall -g syntaxer.cpp
+
+lexer.o: lexer.cpp
+	g++ -c -Wall -g lexer.cpp
+
+rpn.o: rpn.cpp
+	g++ -c -Wall -g rpn.cpp
+
+clean:
+	rm -rf *.o 
