@@ -19,7 +19,16 @@ public:
     {
             printf("%s on line %d\n", errmsg, line);
     }
+    error(const error & a);
 };
+
+error::error(const error & a)
+{
+    line = a.line;
+    errmsg = new char [strlen(a.errmsg) + 1];
+    strncpy(errmsg, a.errmsg, strlen(a.errmsg));
+    errmsg[strlen(a.errmsg)] = 0;
+}
 
 error::error(int aline, const char * msg)
 {
