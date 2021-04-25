@@ -1,13 +1,13 @@
 all: analys
 
-analys: syntaxer.o lexer.o 
-	g++ syntaxer.o lexer.o  -g -Wall -o analys
+analys: syntaxer.o lexer.o
+	g++ syntaxer.o lexer.o -g -Wall -o analys
 	rm -rf *.o
 
-syntaxer.o: syntaxer.cpp
+syntaxer.o: syntaxer.cpp rpn.h
 	g++ -c -Wall -g syntaxer.cpp
 
-lexer.o: lexer.cpp
+lexer.o: lexer.cpp lexer.h
 	g++ -c -Wall -g lexer.cpp
 
 clean:

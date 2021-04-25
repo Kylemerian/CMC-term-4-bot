@@ -2,6 +2,12 @@
 #include <string.h>
 #include <stdio.h>
 #include "lexer.h"
+#include "rpn.h"
+
+struct listdbg{
+    listdbg * next;
+    char * key;
+};
 
 int isVar(char * a)
 {
@@ -15,8 +21,7 @@ class error
 public:
     error(int aline, const char * msg);
     ~error();
-    void printmsg()
-    {
+    void printmsg(){
             printf("%s on line %d\n", errmsg, line);
     }
 };
@@ -36,6 +41,9 @@ error::~error()
 
 class syntaxer
 {
+    RPNItem * stack;
+    listdbg * dbg;
+    void addToRPN(RPNElem * a);
     int errline;
     list * lexems;
     void exp_hdl();
@@ -60,7 +68,9 @@ class syntaxer
     void safeGetLex(const char * str);
     int isFunc(char * str);
     int equalStr(const char * a, const char * b) const;
+    /**/void addToDBG(const char * str);
 public:
+    /**/void printdbg();
     void checkSeq(list * lexems);
     syntaxer();
 };
@@ -71,8 +81,37 @@ int syntaxer::isFunc(char * str)
         equalStr(str, "?prod") || equalStr(str, "?endturn"); 
 }
 
+void syntaxer::addToRPN(RPNElem * a)
+{
+    RPNItem * tmp = new RPNItem;
+    tmp -> elem = a;
+    tmp -> next = stack;
+    stack = tmp;
+}
+
+/**/void syntaxer::addToDBG(const char * str)
+{
+    listdbg * tmp = new listdbg;
+    tmp -> key = new char [strlen(str) + 1];
+    strncpy(tmp -> key, str, strlen(str));
+    tmp -> key [strlen(str)] = 0;
+    tmp -> next = dbg;
+    dbg = tmp;
+}
+
+/**/void syntaxer::printdbg()
+{
+    while(dbg){
+        printf("%s ", dbg -> key);
+        dbg = dbg -> next;
+    }
+}
+
 syntaxer::syntaxer()
 {
+    /**/dbg = NULL;
+    stack = NULL;
+    addToRPN(new RPNNoOp);
     errline = 0;
     lexems = NULL;
 }
@@ -103,6 +142,8 @@ void syntaxer::exp_hdl()
     if(equalStr(lexems -> lex, "or")){
         safeGetLex("No operand in expression");
         exp_hdl();
+        addToDBG("or");
+        addToRPN(new RPNFunOr);
     }
 }
 
@@ -114,6 +155,8 @@ void syntaxer::exp5_hdl()
     if(equalStr(lexems -> lex, "and")){
         safeGetLex("No operand in expression");
         exp5_hdl();
+        addToDBG("and");
+        addToRPN(new RPNFunAnd);
     }
 }
 
@@ -122,11 +165,26 @@ void syntaxer::exp4_hdl()
     exp3_hdl();
     if(!lexems)
         return;
-    if(equalStr(lexems -> lex, ">") || equalStr(lexems -> lex, "<") 
-        || equalStr(lexems -> lex, "=")){
+    if(equalStr(lexems -> lex, ">")){
         
         safeGetLex("No operand in expression");
         exp4_hdl();
+        addToDBG(">");
+        addToRPN(new RPNFunMore);
+    }
+    else if(equalStr(lexems -> lex, "<")){
+        
+        safeGetLex("No operand in expression");
+        exp4_hdl();
+        addToDBG("<");
+        addToRPN(new RPNFunLess);
+    }
+    else if(equalStr(lexems -> lex, "=")){
+        
+        safeGetLex("No operand in expression");
+        exp4_hdl();
+        addToDBG("=");
+        addToRPN(new RPNFunEqual);
     }
 }
 
@@ -135,9 +193,17 @@ void syntaxer::exp3_hdl()
     exp2_hdl();
     if(!lexems)
         return;
-    if(equalStr(lexems -> lex, "+") || equalStr(lexems -> lex, "-")){
+    if(equalStr(lexems -> lex, "+")){
         safeGetLex("No operand in expression");
         exp3_hdl();
+        addToDBG("+");
+        addToRPN(new RPNFunPlus);
+    }
+    else if(equalStr(lexems -> lex, "-")){
+        safeGetLex("No operand in expression");
+        exp3_hdl();
+        addToDBG("-");
+        addToRPN(new RPNFunMinus);
     }
 }
 
@@ -146,19 +212,45 @@ void syntaxer::exp2_hdl()
     exp1_hdl();
     if(!lexems)
         return;
-    if(equalStr(lexems -> lex, "*") || equalStr(lexems -> lex, "/") 
-        || equalStr(lexems -> lex, "%")){
+    if(equalStr(lexems -> lex, "*")){
         
         safeGetLex("No operand in expression");
         exp2_hdl();
+        addToDBG("*");
+        addToRPN(new RPNFunMultiply);
+    }
+    else if(equalStr(lexems -> lex, "/")){
+        
+        safeGetLex("No operand in expression");
+        exp2_hdl();
+        addToDBG("/");
+        addToRPN(new RPNFunDivision);
+    }
+    else if(equalStr(lexems -> lex, "%")){
+        
+        safeGetLex("No operand in expression");
+        exp2_hdl();
+        addToDBG("%");
+        addToRPN(new RPNFunMod);
     }
 }
 
 void syntaxer::exp1_hdl()
 {
-    if(equalStr(lexems -> lex, "not") || equalStr(lexems -> lex, "-"))
+    if(equalStr(lexems -> lex, "not")){
         safeGetLex("No operand");
-    exp0_hdl();
+        exp0_hdl();
+        addToDBG("!");
+        addToRPN(new RPNFunNot);
+    }
+    else if(equalStr(lexems -> lex, "-")){
+        safeGetLex("No operand");
+        exp0_hdl();
+        addToDBG("-");
+        addToRPN(new RPNFunUnoMinus);
+    }
+    else
+        exp0_hdl();
 }
 
 void syntaxer::exp0_hdl()
@@ -235,6 +327,8 @@ void syntaxer::func_hdl()
 void syntaxer::operand_hdl()
 {
     if(lexems -> type == N){
+        addToDBG(lexems -> lex);
+        addToRPN(new RPNInt(atoi(lexems -> lex)));
         errline = lexems -> line;
         lexems = lexems -> next; 
     }
@@ -253,6 +347,13 @@ void syntaxer::if_hdl()
     checkError("No then in if statement");
     if(!equalStr(lexems -> lex, "then"))
         throw error(lexems -> line, "No then in if statement");
+    //
+    RPNLabel * lab1 = new RPNLabel;
+    addToDBG("lab");
+    addToDBG("!F");
+    addToRPN(lab1);
+    addToRPN(new RPNOpGoFalse);
+    //
     safeGetLex("No { in if statement");
     if(!equalStr(lexems -> lex, "{"))
         throw error(lexems -> line, "No { in if statement");
@@ -261,6 +362,10 @@ void syntaxer::if_hdl()
     checkError("No } in if statement");
     if(!equalStr(lexems -> lex, "}"))
         throw error(lexems -> line, "No } in if statement");
+    //
+    addToDBG("empty");
+    addToRPN(new RPNNoOp);//???
+    //
     errline = lexems -> line;
     lexems = lexems -> next;
 }
@@ -268,10 +373,20 @@ void syntaxer::if_hdl()
 void syntaxer::while_hdl()
 {
     safeGetLex("No expression");
+    //
+    RPNItem * beforeExp = stack;
+    //
     exp_hdl();
     checkError("No do in while statement");
     if(!equalStr(lexems -> lex, "do"))
         throw error(lexems -> line, "No do in while statement");
+    //
+    RPNLabel * lab1 = new RPNLabel;
+    addToDBG("lab");
+    addToDBG("!F"); 
+    addToRPN(lab1);
+    addToRPN(new RPNOpGoFalse);
+    //
     safeGetLex("No { in while statement");
     if(!equalStr(lexems -> lex, "{"))
         throw error(lexems -> line, "No { in while statement");
@@ -280,6 +395,15 @@ void syntaxer::while_hdl()
     checkError("No } in while statement");
     if(!equalStr(lexems -> lex, "}"))
         throw error(lexems -> line, "No } in while statement");
+    //
+    addToDBG("b4EXP");
+    addToDBG("Jump");
+    addToDBG("empty");
+    addToRPN(new RPNLabel(beforeExp));
+    addToRPN(new RPNOpGo);
+    addToRPN(new RPNNoOp);//???
+    lab1->set(stack);
+    //
     errline = lexems -> line;
     lexems = lexems -> next;
 }
@@ -339,10 +463,8 @@ void syntaxer::statement_hdl()
     else if(isFunc(lexems -> lex)){
         func_hdl();
         checkError("No ; after statement");
-        if(!equalStr(lexems -> lex, ";")){
-            printf("%s \n", lexems -> lex);
+        if(!equalStr(lexems -> lex, ";"))
             throw error(lexems -> line, "No ; after statement");
-        }
         errline = lexems -> line;
         lexems = lexems -> next;
     }
@@ -382,6 +504,7 @@ int main()
     lex.reverse();
     if(!lex.hasError())
         syntax.checkSeq(lex.getLexList());
+    /**/syntax.printdbg();
     return 0;
 }
 
