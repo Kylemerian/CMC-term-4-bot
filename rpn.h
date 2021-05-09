@@ -14,6 +14,7 @@ class RPNElem
 public:
     virtual ~RPNElem(){};
     virtual void evaluate(RPNItem ** stack, RPNItem ** curCmd) const = 0;
+    virtual void print() const = 0;
 protected:
     static void push(RPNItem ** stack, RPNElem * elem){
         RPNItem * tmp = new RPNItem;
@@ -41,6 +42,7 @@ public:
         push(stack, clone());
         *curCmd = (*curCmd) -> next;
     }
+    void print() const = 0;
 };
 
 class RPNFunction : public RPNElem
@@ -70,6 +72,10 @@ public:
     void set(RPNItem * lab){
         value = lab;
     }
+    void print() const{
+        printf("&");
+        value->elem->print();
+    }
 };
 
 class RPNInt : public RPNConst
@@ -83,6 +89,9 @@ public:
     }
     int get() const{
         return value;
+    }
+    void print() const{
+        printf("%d ", value);
     }
 };
 
@@ -99,6 +108,9 @@ public:
         RPNItem * addr = lab->get();
         *curCmd = addr;
         delete op1;      
+    }
+    void print() const{
+        printf("! ");
     }
 };
 
@@ -125,6 +137,9 @@ public:
 		delete op1;
 		delete op2;
 	}
+    void print() const{
+        printf("!F ");
+    }
 };
 
 class RPNString : public RPNConst
@@ -133,46 +148,147 @@ class RPNString : public RPNConst
 public:
     RPNString(){}
 	virtual ~RPNString(){}
-	RPNString(char *a){
+	RPNString(char * a){
         value = a;
     }
 	virtual RPNElem* clone() const{
         return new RPNString(value);
     }
-	char* Get() const {
+	char * get() const {
         return value;
+    }
+    void print() const{
+        printf("%s ", value);
     }
 };
 
 
 class RPNVarAddr : public RPNConst
 {
-
+//name
+    char * value;
+public:
+    RPNVarAddr(){}
+    virtual ~RPNVarAddr(){}
+    RPNElem * evaluate(){
+        return 0;
+    }
+    RPNVarAddr(char * a){
+        value = a;
+    }
+    virtual RPNElem* clone() const{
+        return new RPNVarAddr(value);
+    }
+    char * get() const {
+        return value;
+    }
+    void print() const{
+        printf("%s ", value);
+    }
 };
 
-class RPNVar : public RPNFunction
+class RPNFunVar : public RPNFunction
 {
-
+public:
+    RPNFunVar(){}
+    virtual ~RPNFunVar(){}
+    RPNElem * evaluateFun(RPNItem ** stack){
+        RPNElem * op1 = pop(stack);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
+        if(!i1)
+            throw op1;
+        RPNElem * op2 = pop(stack);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
+        if(!i2)
+            throw op2;
+        int res = 0;
+        //res = findVar(i2 i1);
+        delete op1;
+        delete op2;
+        return new RPNInt(res);
+    }
 };
 
 class RPNSell : public RPNFunction
 {
-    
+public:
+    RPNSell(){};
+    virtual ~RPNSell(){};
+    RPNElem * evaluateFun(RPNItem ** stack) const{
+        RPNElem * op1 = pop(stack);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
+        if(!i1)
+            throw op1;
+        RPNElem * op2 = pop(stack);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
+        if(!i2)
+            throw op2;
+        /**/
+        delete op1;
+        delete op2;
+        return 0;
+    }
+    void print() const{
+        printf("?sell ");
+    }
 };
 
 class RPNBuy : public RPNFunction
 {
-    
+public:
+    RPNBuy(){};
+    virtual ~RPNBuy(){};
+    RPNElem * evaluateFun(RPNItem ** stack) const{
+        RPNElem * op1 = pop(stack);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
+        if(!i1)
+            throw op1;
+        RPNElem * op2 = pop(stack);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
+        if(!i2)
+            throw op2;
+        /**/
+        delete op1;
+        delete op2;
+        return 0;
+    }
+    void print() const{
+        printf("?buy ");
+    }
 };
 
 class RPNEndturn : public RPNFunction
 {
-    
+public:
+    RPNEndturn(){};
+    virtual ~RPNEndturn(){};
+    RPNElem * evaluateFun(RPNItem ** stack) const{
+        /**/
+        return 0;
+    }
+    void print() const{
+        printf("?endturn ");
+    }
 };
 
 class RPNProd : public RPNFunction
 {
-    
+public:
+	RPNProd(){}
+	virtual ~RPNProd(){}
+	RPNElem * evaluateFun(RPNItem **stack) const 
+	{
+		RPNElem * op1 = pop(stack); 
+		RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
+		if (!i1)
+            throw op1;
+		/**/
+		delete op1;
+		return 0;
+	}
+    void print() const{
+        printf("?prod ");
+    }
 };
 
 class RPNFunPlus : public RPNFunction
@@ -182,17 +298,20 @@ public:
     virtual ~RPNFunPlus(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() + i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("+ ");
     }
 };
 
@@ -209,6 +328,9 @@ public:
        	 	delete op1;
         	return new RPNInt(res);
     }
+    void print() const{
+        printf("- ");
+    }
 };
 
 class RPNFunMinus : public RPNFunction
@@ -218,17 +340,20 @@ public:
     virtual ~RPNFunMinus(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() - i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("- ");
     }
 };
 
@@ -239,17 +364,20 @@ public:
     virtual ~RPNFunMultiply(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() * i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("* ");
     }
 };
 
@@ -260,17 +388,20 @@ public:
     virtual ~RPNFunDivision(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() / i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("/ ");
     }
 };
 
@@ -281,17 +412,20 @@ public:
     virtual ~RPNFunMod(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() % i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("%% ");
     }
 };
 
@@ -302,12 +436,15 @@ public:
     virtual ~RPNFunNot(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         int res = !(i1 -> get());
         delete op1;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("not ");
     }
 };
 
@@ -318,17 +455,20 @@ public:
     virtual ~RPNFunAnd(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() && i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("and ");
     }
 };
 
@@ -339,17 +479,20 @@ public:
     virtual ~RPNFunOr(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() || i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("or ");
     }
 };
 
@@ -360,17 +503,20 @@ public:
     virtual ~RPNFunEqual(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() == i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("= ");
     }
 };
 
@@ -381,17 +527,20 @@ public:
     virtual ~RPNFunLess(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() < i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("< ");
     }
 };
 
@@ -402,17 +551,20 @@ public:
     virtual ~RPNFunMore(){};
     RPNElem * evaluateFun(RPNItem ** stack) const{
         RPNElem * op1 = pop(stack);
-        RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
             throw op1;
         RPNElem * op2 = pop(stack);
-        RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
             throw op2;
         int res = i1 -> get() > i2 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
+    }
+    void print() const{
+        printf("> ");
     }
 };
 
@@ -421,17 +573,45 @@ class RPNFunAssign : public RPNFunction
 public:
     RPNFunAssign() {};
     virtual ~RPNFunAssign(){};
-
+    void print() const{
+        printf(":= ");
+    }
 };
 
-class RPNNoOp : public RPNElem
+class RPNPrint : public RPNFunction
 {
 public:
-    RPNNoOp(){};
-    virtual ~RPNNoOp(){};
-    void evaluate(RPNItem ** stack, RPNItem ** curCmd) const{
+    RPNPrint(){};
+    virtual ~RPNPrint(){};
+    RPNElem * evaluateFun(RPNItem ** stack) const{
+        RPNElem * op1 = pop(stack);
+        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
+        RPNString * i2 = dynamic_cast<RPNString *>(op1);
+        if(!i1 && !i2)
+            throw op1;
+        if(i1)
+            printf("%d ", i1 -> get());
+        else
+            printf("%s ", i2 -> get());
+        delete op1;
+        return 0;
+    }
+    void print() const{
+        printf("?print ");
+    }
+};
 
-    };
+class RPNNoOp : public RPNFunction
+{
+public:
+	RPNNoOp(){}
+	virtual ~RPNNoOp(){}
+	RPNElem* evaluateFun(RPNItem **stack) const{
+    	return 0;
+	}
+    void print() const{
+        printf("NP ");
+    }
 };
 
 #endif

@@ -4,7 +4,7 @@ analys: syntaxer.o lexer.o
 	g++ syntaxer.o lexer.o -g -Wall -o analys
 	rm -rf *.o
 
-syntaxer.o: syntaxer.cpp rpn.h
+syntaxer.o: syntaxer.cpp rpn.h vars.h
 	g++ -c -Wall -g syntaxer.cpp
 
 lexer.o: lexer.cpp lexer.h
