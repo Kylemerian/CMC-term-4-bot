@@ -256,7 +256,6 @@ void syntaxer::exp0_hdl()
 
 void syntaxer::assign_hdl()
 {
-    var_hdl();
     checkError("No := in assign");
     if(!equalStr(lexems -> lex, ":="))
         throw error(lexems -> line, "No := in assign");
@@ -320,10 +319,10 @@ void syntaxer::operand_hdl()
         lexems = lexems -> next; 
     }
     else if(isVar(lexems -> lex)){
-        //addToRPN(new RPNVarAddr);
         char * tmp = lexems -> lex;
         var_hdl();
         addToRPN(new RPNVarAddr(tmp));
+        addToRPN(new RPNFunVar);
     }
     else if(isFunc(lexems -> lex)){
         char * tmp = lexems -> lex;
@@ -452,8 +451,10 @@ void syntaxer::statement_hdl()
     }
     else if(isVar(lexems -> lex)){
         char * tmp = lexems -> lex;
-        assign_hdl();
+        var_hdl();
         addToRPN(new RPNVarAddr(tmp));
+        assign_hdl();
+        addToRPN(new RPNFunAssign);
     }
     else if(!equalStr(lexems -> lex, "}")){
         throw error(lexems -> line, "Incorrect statement");
