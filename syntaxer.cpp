@@ -76,15 +76,42 @@ class syntaxer
     void addFuncToRPN(char * s);
     int equalStr(const char * a, const char * b) const;
 public:
-    /**/void printRPN(){
+    /**/void printVar(){
+        varlist * tmp = var.data;
+        while(tmp){
+            printf("wadsdasdsd");
+            printf("name = %s index = %d value = %d", tmp->name, tmp->index, tmp->value);
+            tmp = tmp -> next;
+        }
+    }
+    /**/void exc(){
         while(rpn){
-            rpn->elem->print();
-            rpn = rpn -> next;
+            rpn -> elem -> evaluate(&stack, &rpn, &var);
+            //rpn = rpn -> next;
+        }
+    }
+    /**/void reverse();
+    void printRPN(){
+        RPNItem * tmp = rpn;
+        while(tmp){
+            tmp -> elem -> print();
+            tmp = tmp -> next;
         }
     }
     void checkSeq(list * lexems);
     syntaxer();
 };
+
+void syntaxer::reverse()
+{
+    RPNItem * rev = NULL;
+    for(RPNItem * qq = rpn, *next_node; qq != NULL; qq = next_node){
+        next_node = qq->next;
+        qq -> next = rev;
+        rev = qq;
+    }
+    rpn = rev;
+}
 
 void syntaxer::addFuncToRPN(char * s)
 {
@@ -490,7 +517,16 @@ int main()
     lex.reverse();
     if(!lex.hasError())
         syntax.checkSeq(lex.getLexList());
+    syntax.reverse();
     syntax.printRPN();
+    printf("\n");
+    /**/syntax.printVar();
+    try{
+        syntax.exc();
+    }
+    catch(const char * s){
+        printf("\n%s\n", s);
+    }
     return 0;
 }
 

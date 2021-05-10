@@ -38,6 +38,7 @@ protected:
 class RPNConst : public RPNElem
 {
 public:
+    virtual ~RPNConst(){};
     virtual RPNElem * clone() const = 0;
     void evaluate(RPNItem ** stack, RPNItem ** curCmd, varInfo * vars) const{
         push(stack, clone());
@@ -49,6 +50,7 @@ public:
 class RPNFunction : public RPNElem
 {
 public:
+virtual ~RPNFunction(){};
     virtual RPNElem * evaluateFun(RPNItem ** stack, varInfo * vars) const = 0;
     void evaluate(RPNItem ** stack, RPNItem ** curCmd, varInfo * vars) const{
         RPNElem * res = evaluateFun(stack, vars);
@@ -62,7 +64,9 @@ class RPNLabel : public RPNConst
 {
     RPNItem * value;
 public:
-    RPNLabel(RPNItem * a = NULL){value = a; }
+    RPNLabel(RPNItem * a = NULL){
+        value = a;
+    }
     virtual ~RPNLabel(){};
     virtual RPNElem * clone() const{
         return new RPNLabel(value);
@@ -107,7 +111,7 @@ public:
         RPNElem* op1 = pop(stack);
         RPNLabel * lab = dynamic_cast<RPNLabel *>(op1);
         if(!lab)
-            throw op1;
+            throw "OpGo";
         RPNItem * addr = lab->get();
         *curCmd = addr;
         delete op1;      
@@ -124,14 +128,14 @@ public:
 	virtual ~RPNOpGoFalse(){}
 	void evaluate(RPNItem ** stack, RPNItem ** cur_cmd, varInfo * vars) const{
 		RPNElem *op1 = pop(stack);
-		RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
-		if (!i1)
-            throw op1;
-		RPNElem *op2 = pop(stack);
-		RPNLabel *lab = dynamic_cast<RPNLabel *>(op2);
+		RPNLabel *lab = dynamic_cast<RPNLabel *>(op1);
 		if (!lab)
-            throw lab;
-		if (!i1->get()){
+            throw "OpGoFalse";
+		RPNElem *op2 = pop(stack);
+		RPNInt *i2 = dynamic_cast<RPNInt *>(op2);
+		if (!i2)
+            throw "OpGoFalse";
+		if (!i2->get()){
 			RPNItem *addr = lab->get();
 			*cur_cmd = addr;
 		}
@@ -194,14 +198,16 @@ public:
     virtual ~RPNFunVar(){}
     RPNElem * evaluateFun(RPNItem ** stack, varInfo * vars) const{
         RPNElem * op1 = pop(stack);
-        RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
+        //op1 -> print();
+        RPNVarAddr * i1 = dynamic_cast<RPNVarAddr *>(op1);
         if(!i1)
-            throw op1;
+            throw "FunVar";
         RPNElem * op2 = pop(stack);
-        RPNString * i2 = dynamic_cast<RPNString *>(op2);
+        //op2 -> print();
+        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
-        int res = vars -> findVar(i2 -> get(), i1 -> get());
+            throw "FunVar";
+        int res = vars -> findVar(i1 -> get(), i2 -> get());
         delete op1;
         delete op2;
         return new RPNInt(res);
@@ -220,11 +226,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Sell";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "Sell";
         /**/
         delete op1;
         delete op2;
@@ -244,11 +250,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Buy";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "Buy";
         /**/
         delete op1;
         delete op2;
@@ -283,7 +289,7 @@ public:
 		RPNElem * op1 = pop(stack); 
 		RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
 		if (!i1)
-            throw op1;
+            throw "Prod";
 		/**/
 		delete op1;
 		return 0;
@@ -302,11 +308,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Plus";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "Plus";
         int res = i1 -> get() + i2 -> get();
         delete op1;
         delete op2;
@@ -325,7 +331,7 @@ public:
         	RPNElem *op1 = pop(stack);
         	RPNInt *i1 = dynamic_cast<RPNInt *>(op1);
         	if (!i1)
-                throw op1;
+                throw "Minus";
         	int res = -(i1 -> get());
        	 	delete op1;
         	return new RPNInt(res);
@@ -344,12 +350,12 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Minus";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
-        int res = i1 -> get() - i2 -> get();
+            throw "Minus";
+        int res = i2 -> get() - i1 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
@@ -368,11 +374,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Multiply";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "Multiply";
         int res = i1 -> get() * i2 -> get();
         delete op1;
         delete op2;
@@ -392,12 +398,12 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Division";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
-        int res = i1 -> get() / i2 -> get();
+            throw "Divsion";
+        int res = i2 -> get() / i1 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
@@ -416,12 +422,12 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Mod";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
-        int res = i1 -> get() % i2 -> get();
+            throw "Mod";
+        int res = i2 -> get() % i1 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
@@ -440,7 +446,7 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Not";
         int res = !(i1 -> get());
         delete op1;
         return new RPNInt(res);
@@ -459,11 +465,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "And";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "And";
         int res = i1 -> get() && i2 -> get();
         delete op1;
         delete op2;
@@ -483,11 +489,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Or";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "Or";
         int res = i1 -> get() || i2 -> get();
         delete op1;
         delete op2;
@@ -507,11 +513,11 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Equal";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
+            throw "Equal";
         int res = i1 -> get() == i2 -> get();
         delete op1;
         delete op2;
@@ -531,12 +537,12 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Less";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
-        int res = i1 -> get() < i2 -> get();
+            throw "Less";
+        int res = i2 -> get() < i1 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
@@ -555,12 +561,12 @@ public:
         RPNElem * op1 = pop(stack);
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "More";
         RPNElem * op2 = pop(stack);
         RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
         if(!i2)
-            throw op2;
-        int res = i1 -> get() > i2 -> get();
+            throw "More";
+        int res = i2 -> get() > i1 -> get();
         delete op1;
         delete op2;
         return new RPNInt(res);
@@ -577,18 +583,20 @@ public:
     virtual ~RPNFunAssign(){};
     RPNElem * evaluateFun(RPNItem ** stack, varInfo * vars) const{
         RPNElem * op1 = pop(stack);
+        //op1 -> print();
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         if(!i1)
-            throw op1;
+            throw "Assign1";
         RPNElem * op2 = pop(stack);
-        RPNInt * i2 = dynamic_cast<RPNInt *>(op2);
+        //op2 -> print();
+        RPNVarAddr * i2 = dynamic_cast<RPNVarAddr *>(op2);
         if(!i2)
-            throw op2;
+            throw "Assign2";
         RPNElem * op3 = pop(stack);
-        RPNString * i3 = dynamic_cast<RPNString *>(op3);
+        RPNInt * i3 = dynamic_cast<RPNInt *>(op3);
         if(!i3)
-            throw op3;
-        vars -> assignVar(i3 -> get(), i1 -> get(), i2 -> get());
+            throw "Assign3";
+        vars -> assignVar(i2 -> get(), i3 -> get(), i1 -> get());
         delete op1;
         delete op2;
         delete op3;
@@ -609,7 +617,7 @@ public:
         RPNInt * i1 = dynamic_cast<RPNInt *>(op1);
         RPNString * i2 = dynamic_cast<RPNString *>(op1);
         if(!i1 && !i2)
-            throw op1;
+            throw "Print";
         if(i1)
             printf("%d ", i1 -> get());
         else
