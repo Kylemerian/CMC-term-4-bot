@@ -4,7 +4,34 @@
 #include "lexer.h"
 #include "rpn.h"
 #include "vars.h"
+/*
+enum
+{
+    lvl0,
+    lvl1,
+    lvl2,
+    lvl3,
+    lvl4,
+    lvl5
+};
 
+struct operation
+{
+    char * exp[6];
+    operation(){
+        for (int i = 0; i < 6; i++)
+            exp[i] = 0;
+    }
+    char * exchange(int level, char * newl){
+        char * tmp = exp[level];
+        exp[level] = newl;
+        return tmp;
+    }
+    char * getOp(int level){
+        return exp[level];
+    }
+};
+*/
 int isVar(char * a)
 {
     return a[0] == '$';
@@ -47,6 +74,7 @@ error::~error()
 class syntaxer
 {
     varInfo var;
+    //operation opers;
     RPNItem * stack;
     RPNItem * rpn;
     void addToRPN(RPNElem * a);
@@ -74,49 +102,50 @@ class syntaxer
     void safeGetLex(const char * str);
     int isFunc(char * str);
     void addFuncToRPN(char * s);
+    void addOperToRPN(char * s);
+    void addUnOperToRPN(char * s);
     int equalStr(const char * a, const char * b) const;
 public: 
-    /**/void freemem(){
-        var.freemem();
-        RPNItem * tmp = rpn;
-        while(rpn){
-            tmp = rpn;
-            rpn = rpn -> next;
-            delete tmp->elem;
-            delete tmp;
-        }
-        tmp = stack;
-        while(stack){
-            tmp = stack;
-            stack = stack -> next;
-            delete tmp->elem;
-            delete tmp;
-        }
-    }
-    /**/void printVar(){
-        varlist * tmp = var.data;
-        while(tmp){
-            printf("name = %s index = %d value = %d", tmp->name, tmp->index, tmp->value);
-            tmp = tmp -> next;
-        }
-    }
-    /**/void exc(){
+    void freemem();
+    void exc(){
         RPNItem * tmp = rpn;
         while(tmp){
             tmp -> elem -> evaluate(&stack, &tmp, &var);
         }
     }
-    /**/void reverse();
-    void printRPN(){
-        RPNItem * tmp = rpn;
-        while(tmp){
-            tmp -> elem -> print();
-            tmp = tmp -> next;
-        }
-    }
+    void reverse();
+    void printRPN();
     void checkSeq(list * lexems);
     syntaxer();
 };
+
+void syntaxer::freemem()
+{
+    var.freemem();
+    RPNItem * tmp = rpn;
+    while(rpn){
+        tmp = rpn;
+        rpn = rpn -> next;
+        delete tmp->elem;
+        delete tmp;
+    }
+    tmp = stack;
+    while(stack){
+        tmp = stack;
+        stack = stack -> next;
+        delete tmp->elem;
+        delete tmp;
+    }
+}
+
+void syntaxer::printRPN()
+{
+    RPNItem * tmp = rpn;
+    while(tmp){
+        tmp -> elem -> print();
+        tmp = tmp -> next;
+    }
+}
 
 void syntaxer::reverse()
 {
@@ -127,6 +156,38 @@ void syntaxer::reverse()
         rev = qq;
     }
     rpn = rev;
+}
+
+void syntaxer::addOperToRPN(char * s)
+{
+    if(equalStr(s, "+"))
+        addToRPN(new RPNFunPlus);
+    if(equalStr(s, "-"))
+        addToRPN(new RPNFunMinus);
+    if(equalStr(s, "*"))
+        addToRPN(new RPNFunMultiply);
+    if(equalStr(s, "/"))
+        addToRPN(new RPNFunDivision);
+    if(equalStr(s, "%"))
+        addToRPN(new RPNFunMod);
+    if(equalStr(s, "or"))
+        addToRPN(new RPNFunOr);
+    if(equalStr(s, "and"))
+        addToRPN(new RPNFunAnd);
+    if(equalStr(s, "<"))
+        addToRPN(new RPNFunLess);
+    if(equalStr(s, ">"))
+        addToRPN(new RPNFunMore);
+    if(equalStr(s, "="))
+        addToRPN(new RPNFunEqual);
+}
+
+void syntaxer::addUnOperToRPN(char * s)
+{
+    if(equalStr(s, "not"))
+        addToRPN(new RPNFunNot);
+    if(equalStr(s, "-"))
+        addToRPN(new RPNFunUnoMinus);
 }
 
 void syntaxer::addFuncToRPN(char * s)
@@ -155,7 +216,7 @@ void syntaxer::addToRPN(RPNElem * a)
     rpn = tmp;
 }
 
-syntaxer::syntaxer() : var()
+syntaxer::syntaxer() : var()//, opers()
 {
     stack = NULL;
     rpn = NULL;
@@ -188,9 +249,10 @@ void syntaxer::exp_hdl()
     if(!lexems)
         return;
     if(equalStr(lexems -> lex, "or")){
+        char * tmp = lexems -> lex;
         safeGetLex("No operand in expression");
         exp_hdl();
-        addToRPN(new RPNFunOr);
+        addOperToRPN(tmp);
     }
 }
 
@@ -200,9 +262,10 @@ void syntaxer::exp5_hdl()
     if(!lexems)
         return;
     if(equalStr(lexems -> lex, "and")){
+        char * tmp = lexems -> lex;
         safeGetLex("No operand in expression");
         exp5_hdl();
-        addToRPN(new RPNFunAnd);
+        addOperToRPN(tmp);
     }
 }
 
@@ -211,20 +274,13 @@ void syntaxer::exp4_hdl()
     exp3_hdl();
     if(!lexems)
         return;
-    if(equalStr(lexems -> lex, ">")){
+    if(equalStr(lexems -> lex, ">") || equalStr(lexems -> lex, "<")
+        || equalStr(lexems -> lex, "=")){
+        
+        char * tmp = lexems -> lex;
         safeGetLex("No operand in expression");
         exp4_hdl();
-        addToRPN(new RPNFunMore);
-    }
-    else if(equalStr(lexems -> lex, "<")){
-        safeGetLex("No operand in expression");
-        exp4_hdl();
-        addToRPN(new RPNFunLess);
-    }
-    else if(equalStr(lexems -> lex, "=")){
-        safeGetLex("No operand in expression");
-        exp4_hdl();
-        addToRPN(new RPNFunEqual);
+        addOperToRPN(tmp);
     }
 }
 
@@ -233,15 +289,11 @@ void syntaxer::exp3_hdl()
     exp2_hdl();
     if(!lexems)
         return;
-    if(equalStr(lexems -> lex, "+")){
+    if(equalStr(lexems -> lex, "+") || equalStr(lexems -> lex, "-")){
+        char * tmp = lexems -> lex;
         safeGetLex("No operand in expression");
         exp3_hdl();
-        addToRPN(new RPNFunPlus);
-    }
-    else if(equalStr(lexems -> lex, "-")){
-        safeGetLex("No operand in expression");
-        exp3_hdl();
-        addToRPN(new RPNFunMinus);
+        addOperToRPN(tmp);
     }
 }
 
@@ -250,34 +302,23 @@ void syntaxer::exp2_hdl()
     exp1_hdl();
     if(!lexems)
         return;
-    if(equalStr(lexems -> lex, "*")){
+    if(equalStr(lexems -> lex, "*") || equalStr(lexems -> lex, "/")
+        || equalStr(lexems -> lex, "%")){
+        
+        char * tmp = lexems -> lex;
         safeGetLex("No operand in expression");
         exp2_hdl();
-        addToRPN(new RPNFunMultiply);
-    }
-    else if(equalStr(lexems -> lex, "/")){
-        safeGetLex("No operand in expression");
-        exp2_hdl();
-        addToRPN(new RPNFunDivision);
-    }
-    else if(equalStr(lexems -> lex, "%")){
-        safeGetLex("No operand in expression");
-        exp2_hdl();
-        addToRPN(new RPNFunMod);
+        addOperToRPN(tmp);
     }
 }
 
 void syntaxer::exp1_hdl()
 {
-    if(equalStr(lexems -> lex, "not")){
+    if(equalStr(lexems -> lex, "not") || equalStr(lexems -> lex, "-")){
+        char * tmp = lexems -> lex;
         safeGetLex("No operand");
         exp0_hdl();
-        addToRPN(new RPNFunNot);
-    }
-    else if(equalStr(lexems -> lex, "-")){
-        safeGetLex("No operand");
-        exp0_hdl();
-        addToRPN(new RPNFunUnoMinus);
+        addUnOperToRPN(tmp);
     }
     else
         exp0_hdl();
@@ -517,6 +558,7 @@ void syntaxer::checkSeq(list * qlexems)
     {
         err = 1;
         a.printmsg();
+        exit(0);
     }
     if(!err)
         printf("OK\n");
@@ -531,14 +573,12 @@ int main()
         lex.sendChar(c);
     c = ' ';
     lex.sendChar(c);
-    //lex.print();
     lex.reverse();
     if(!lex.hasError())
         syntax.checkSeq(lex.getLexList());
     syntax.reverse();
     syntax.printRPN();
     printf("\n");
-    //syntax.printVar();
     try{
         syntax.exc();
     }
@@ -546,7 +586,6 @@ int main()
         printf("\n%s\n", s);
     }
     syntax.freemem();
-    //delete &lex;
     return 0;
 }
 
