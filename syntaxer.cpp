@@ -75,19 +75,35 @@ class syntaxer
     int isFunc(char * str);
     void addFuncToRPN(char * s);
     int equalStr(const char * a, const char * b) const;
-public:
+public: 
+    /**/void freemem(){
+        var.freemem();
+        RPNItem * tmp = rpn;
+        while(rpn){
+            tmp = rpn;
+            rpn = rpn -> next;
+            delete tmp->elem;
+            delete tmp;
+        }
+        tmp = stack;
+        while(stack){
+            tmp = stack;
+            stack = stack -> next;
+            delete tmp->elem;
+            delete tmp;
+        }
+    }
     /**/void printVar(){
         varlist * tmp = var.data;
         while(tmp){
-            printf("wadsdasdsd");
             printf("name = %s index = %d value = %d", tmp->name, tmp->index, tmp->value);
             tmp = tmp -> next;
         }
     }
     /**/void exc(){
-        while(rpn){
-            rpn -> elem -> evaluate(&stack, &rpn, &var);
-            //rpn = rpn -> next;
+        RPNItem * tmp = rpn;
+        while(tmp){
+            tmp -> elem -> evaluate(&stack, &tmp, &var);
         }
     }
     /**/void reverse();
@@ -141,10 +157,11 @@ void syntaxer::addToRPN(RPNElem * a)
 
 syntaxer::syntaxer() : var()
 {
+    stack = NULL;
     rpn = NULL;
-    addToRPN(new RPNNoOp);
     errline = 0;
     lexems = NULL;
+    addToRPN(new RPNNoOp);
 }
 
 void syntaxer::checkError(const char * str)
@@ -387,6 +404,7 @@ void syntaxer::if_hdl()
 void syntaxer::while_hdl()
 {
     safeGetLex("No expression");
+    addToRPN(new RPNNoOp);
     RPNItem * beforeExp = rpn;
     exp_hdl();
     checkError("No do in while statement");
@@ -520,13 +538,15 @@ int main()
     syntax.reverse();
     syntax.printRPN();
     printf("\n");
-    /**/syntax.printVar();
+    //syntax.printVar();
     try{
         syntax.exc();
     }
     catch(const char * s){
         printf("\n%s\n", s);
     }
+    syntax.freemem();
+    //delete &lex;
     return 0;
 }
 

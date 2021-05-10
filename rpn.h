@@ -593,6 +593,7 @@ public:
         if(!i2)
             throw "Assign2";
         RPNElem * op3 = pop(stack);
+        //op3 -> print();
         RPNInt * i3 = dynamic_cast<RPNInt *>(op3);
         if(!i3)
             throw "Assign3";
