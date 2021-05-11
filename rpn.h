@@ -605,6 +605,20 @@ public:
     }
 };
 
+class RPNPrintln : public RPNFunction
+{
+public:
+    RPNPrintln(){};
+    virtual ~RPNPrintln(){};
+    RPNElem * evaluateFun(RPNItem ** stack, varInfo * vars) const{
+        printf("\n");
+        return 0;
+    }
+    void print() const{
+        printf("?println ");
+    }
+};
+
 class RPNPrint : public RPNFunction
 {
 public:

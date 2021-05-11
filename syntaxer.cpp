@@ -4,34 +4,7 @@
 #include "lexer.h"
 #include "rpn.h"
 #include "vars.h"
-/*
-enum
-{
-    lvl0,
-    lvl1,
-    lvl2,
-    lvl3,
-    lvl4,
-    lvl5
-};
 
-struct operation
-{
-    char * exp[6];
-    operation(){
-        for (int i = 0; i < 6; i++)
-            exp[i] = 0;
-    }
-    char * exchange(int level, char * newl){
-        char * tmp = exp[level];
-        exp[level] = newl;
-        return tmp;
-    }
-    char * getOp(int level){
-        return exp[level];
-    }
-};
-*/
 int isVar(char * a)
 {
     return a[0] == '$';
@@ -71,11 +44,30 @@ error::~error()
     delete[] errmsg;
 }
 
-class syntaxer
+class RPN
 {
     varInfo var;
-    //operation opers;
+    RPNItem * rpn;
     RPNItem * stack;
+    void freemem();
+public:
+    void exc(){
+        RPNItem * tmp = rpn;
+        while(tmp){
+            tmp -> elem -> evaluate(&stack, &tmp, &var);
+        }
+    }
+    RPN(RPNItem * arpn) : var(){
+        stack = 0;
+        rpn = arpn;
+    }
+    ~RPN(){
+        freemem();
+    }
+};
+
+class syntaxer
+{
     RPNItem * rpn;
     void addToRPN(RPNElem * a);
     int errline;
@@ -96,6 +88,7 @@ class syntaxer
     void exp4_hdl();
     void exp5_hdl();
     void print_hdl();
+    void println_hdl();
     void pr_list_hdl();
     void pr_elem_hdl();
     void checkError(const char * str);
@@ -105,21 +98,18 @@ class syntaxer
     void addOperToRPN(char * s);
     void addUnOperToRPN(char * s);
     int equalStr(const char * a, const char * b) const;
-public: 
-    void freemem();
-    void exc(){
-        RPNItem * tmp = rpn;
-        while(tmp){
-            tmp -> elem -> evaluate(&stack, &tmp, &var);
-        }
-    }
     void reverse();
+public:
+    RPNItem * getRPN(){
+        reverse();
+        return rpn;
+    } 
     void printRPN();
     void checkSeq(list * lexems);
     syntaxer();
 };
 
-void syntaxer::freemem()
+void RPN::freemem()
 {
     var.freemem();
     RPNItem * tmp = rpn;
@@ -216,9 +206,8 @@ void syntaxer::addToRPN(RPNElem * a)
     rpn = tmp;
 }
 
-syntaxer::syntaxer() : var()//, opers()
+syntaxer::syntaxer() //, opers()
 {
-    stack = NULL;
     rpn = NULL;
     errline = 0;
     lexems = NULL;
@@ -517,12 +506,24 @@ void syntaxer::body_hdl()
     }
 }
 
+void syntaxer::println_hdl()
+{
+    safeGetLex("No ; after println");
+    if(!equalStr(lexems -> lex, ";"))
+        throw error(lexems -> line, "No ; after statement");
+    addToRPN(new RPNPrintln);
+    errline = lexems -> line;
+    lexems = lexems -> next;
+}
+
 void syntaxer::statement_hdl()
 {
     if(equalStr(lexems -> lex, "while"))
         while_hdl();
     else if(equalStr(lexems -> lex, "print"))
         print_hdl();
+    else if(equalStr(lexems -> lex, "println"))
+        println_hdl();
     else if(equalStr(lexems -> lex, "if"))
         if_hdl();
     else if(isFunc(lexems -> lex)){
@@ -576,16 +577,15 @@ int main()
     lex.reverse();
     if(!lex.hasError())
         syntax.checkSeq(lex.getLexList());
-    syntax.reverse();
     syntax.printRPN();
     printf("\n");
+    RPN prog(syntax.getRPN());
     try{
-        syntax.exc();
+        prog.exc();
     }
     catch(const char * s){
         printf("\n%s\n", s);
     }
-    syntax.freemem();
     return 0;
 }
 
